@@ -1,0 +1,4 @@
+name: HomiesLib
+version: '1.0-SNAPSHOT'
+main: dev.al3mid3x.lib.HomiesLib
+api-version: '1.21'
