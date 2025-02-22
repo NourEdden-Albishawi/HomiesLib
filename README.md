@@ -42,7 +42,7 @@ Whether you're working on a private server or just curious about how Homies Base
 </dependency>
 ```
 
-##Quick Example
+## Quick Example
 Here's a quick example of how to use HomiesLib's configuration framework:
 
 ```java
@@ -75,35 +75,37 @@ We welcome contributions from the community! Whether you're fixing a bug, adding
   git clone https://github.com/YourUsername/HomiesLib.git
 ```
 ### **3. Create a New Branch**
-Create a new branch for your changes:
+- Create a new branch for your changes:
 
 ```bash
 git checkout -b feature/your-feature-name
 ```
 
 ### **4. Make Your Changes**
-Make your changes and test them thoroughly.
+- Make your changes and test them thoroughly.
 
 ### **5. Commit Your Changes**
-Commit your changes with a clear and descriptive commit message:
+- Commit your changes with a clear and descriptive commit message:
 
 ```bash
 
 git commit -m "Add: New feature to improve database handling"
 ```
 ### **6. Push Your Changes**
-Push your changes to your forked repository:
+- Push your changes to your forked repository:
 
 ```bash
 git push origin feature/your-feature-name
 ```
 ### **7. Create a Pull Request**
-Go to the [HomiesLib repository](https://github.com/NourEdden-Albishawi/HomiesLib/) and click New Pull Request.
+- Go to the [HomiesLib repository](https://github.com/NourEdden-Albishawi/HomiesLib/) and click New Pull Request.
 
-Select your branch and provide a detailed description of your changes.
+- Select your branch and provide a detailed description of your changes.
 
 ### **8. Review and Merge**
-Your pull request will be reviewed by the maintainers. Once approved, it will be merged into the main branch.
+- Your pull request will be reviewed by the maintainers. Once approved, it will be merged into the main branch.
+
+
 
 ## Guidelines
 - Follow the existing code style and conventions.
@@ -114,19 +116,19 @@ Your pull request will be reviewed by the maintainers. Once approved, it will be
 
 - Be respectful and constructive in all discussions.
 
+
+
 ## Need Help?
 If you have any questions or need help, feel free to open an issue or join our [Discord server](https://discord.gg/3RDebsPMQG).
 
 Thank you for contributing to HomiesLib! 🎉
 
----
 ## License 📜
 HomiesLib is licensed under the MIT License. See the [LICENSE](https://github.com/NourEdden-Albishawi/HomiesLib/blob/master/LICENSE) file for more details.
+
+
 
 ## About Homies Base 🏠
 Homies Base is a private Minecraft server where friends come together to build, explore, and have fun. HomiesLib is the backbone of many plugins that make this server unique and enjoyable.
 
 **HomiesLib**: The secret sauce behind Homies Base. 🏠✨
-
-
----
