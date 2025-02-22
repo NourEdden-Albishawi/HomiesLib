@@ -34,14 +34,6 @@ Whether you're working on a private server or just curious about how Homies Base
 - **Easy to Use**: Intuitive APIs and clear documentation make it simple to integrate HomiesLib into your projects.
 - **Open Source**: HomiesLib is open for exploration, learning, and collaboration. Feel free to use it as inspiration for your own projects!
 
-```xml
-<dependency>
-    <groupId>com.github.YourUsername</groupId>
-    <artifactId>HomiesLib</artifactId>
-    <version>1.0.0</version>
-</dependency>
-```
-
 ## Quick Example
 Here's a quick example of how to use HomiesLib's configuration framework:
 
