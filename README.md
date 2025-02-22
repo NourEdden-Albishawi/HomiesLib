@@ -105,7 +105,7 @@ Select your branch and provide a detailed description of your changes.
 ### **8. Review and Merge**
 Your pull request will be reviewed by the maintainers. Once approved, it will be merged into the main branch.
 
-##Guidelines
+## Guidelines
 - Follow the existing code style and conventions.
 
 - Write clear and concise commit messages.
@@ -114,16 +114,16 @@ Your pull request will be reviewed by the maintainers. Once approved, it will be
 
 - Be respectful and constructive in all discussions.
 
-##Need Help?
+## Need Help?
 If you have any questions or need help, feel free to open an issue or join our [Discord server](https://discord.gg/3RDebsPMQG).
 
 Thank you for contributing to HomiesLib! 🎉
 
 ---
-##License 📜
-HomiesLib is licensed under the MIT License. See the [LICENSE](https://github.com/NourEdden-Albishawi/HomiesLib/License) file for more details.
+## License 📜
+HomiesLib is licensed under the MIT License. See the [LICENSE](https://github.com/NourEdden-Albishawi/HomiesLib/blob/master/LICENSE) file for more details.
 
-##About Homies Base 🏠
+## About Homies Base 🏠
 Homies Base is a private Minecraft server where friends come together to build, explore, and have fun. HomiesLib is the backbone of many plugins that make this server unique and enjoyable.
 
 **HomiesLib**: The secret sauce behind Homies Base. 🏠✨
