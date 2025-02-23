@@ -1,6 +1,5 @@
-package dev.al3mid3x.lib.entities;
+package dev.al3mid3x.lib.commands;
 
-import dev.al3mid3x.lib.annotations.Parameter;
 import lombok.Getter;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;

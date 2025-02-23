@@ -1,18 +1,16 @@
-package dev.al3mid3x.lib.managers;
+package dev.al3mid3x.lib.configurations;
 
-import dev.al3mid3x.lib.configurations.ConfigFile;
-import dev.al3mid3x.lib.configurations.ConfigKey;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.lang.reflect.Field;
 
 public class ConfigManager {
-    private final JavaPlugin plugin;
+    private final Plugin plugin;
 
-    public ConfigManager(JavaPlugin plugin) {
+    public ConfigManager(Plugin plugin) {
         this.plugin = plugin;
     }
 

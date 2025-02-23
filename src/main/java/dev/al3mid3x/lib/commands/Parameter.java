@@ -1,4 +1,4 @@
-package dev.al3mid3x.lib.annotations;
+package dev.al3mid3x.lib.commands;
 
 
 import java.lang.annotation.ElementType;

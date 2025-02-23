@@ -1,4 +1,4 @@
-package dev.al3mid3x.lib.annotations;
+package dev.al3mid3x.lib.configurations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

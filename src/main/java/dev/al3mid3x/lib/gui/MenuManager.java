@@ -1,7 +1,6 @@
-package dev.al3mid3x.lib.managers;
+package dev.al3mid3x.lib.gui;
 
 import com.google.common.collect.Maps;
-import dev.al3mid3x.lib.gui.LibMenu;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;

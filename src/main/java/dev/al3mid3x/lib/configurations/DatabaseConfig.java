@@ -1,14 +1,19 @@
 package dev.al3mid3x.lib.configurations;
 
-@ConfigFile(fileName = "config.yml")
-public class MainConfig {
-    @ConfigKey(path = "database.url", comment = "The database connection URL")
-    public String databaseUrl = "jdbc:mysql://localhost:3306/minecraft_db";
+@ConfigFile(fileName = "database.yml")
+public class DatabaseConfig {
+    @ConfigKey(path = "type", comment = "Database type (mysql, sqlite)")
+    public String type = "sqlite"; // Default to SQLite
 
-    @ConfigKey(path = "database.username", comment = "The database username")
-    public String databaseUsername = "root";
+    @ConfigKey(path = "mysql.url", comment = "MySQL connection URL")
+    public String mysqlUrl = "jdbc:mysql://localhost:3306/minecraft_db";
 
-    @ConfigKey(path = "database.password", comment = "The database password")
-    public String databasePassword = "password";
+    @ConfigKey(path = "mysql.username", comment = "MySQL username")
+    public String mysqlUsername = "root";
 
+    @ConfigKey(path = "mysql.password", comment = "MySQL password")
+    public String mysqlPassword = "password";
+
+    @ConfigKey(path = "sqlite.path", comment = "SQLite database file path")
+    public String sqlitePath = "plugins/homies-lib/database.db";
 }

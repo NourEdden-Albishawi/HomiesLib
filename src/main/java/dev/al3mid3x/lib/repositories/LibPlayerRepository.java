@@ -8,11 +8,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public class PlayerRepository {
+public class LibPlayerRepository {
     private final Connection connection;
     private final Map<UUID, LibPlayer> cache = new HashMap<>();
 
-    public PlayerRepository(Connection connection) {
+    public LibPlayerRepository(Connection connection) {
         this.connection = connection;
     }
 
