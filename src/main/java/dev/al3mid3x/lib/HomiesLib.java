@@ -3,6 +3,7 @@ package dev.al3mid3x.lib;
 import dev.al3mid3x.lib.configurations.ConfigManager;
 import dev.al3mid3x.lib.configurations.DatabaseConfig;
 import dev.al3mid3x.lib.gui.MenuManager;
+import dev.al3mid3x.lib.managers.ActionBarManager;
 import dev.al3mid3x.lib.tasks.WriteBehindTask;
 import dev.al3mid3x.lib.utils.UnitOfWork;
 import lombok.Getter;
@@ -19,6 +20,7 @@ public final class HomiesLib extends JavaPlugin {
 
     private MenuManager menuManager;
     private ConfigManager configManager;
+    private ActionBarManager actionBarManager;
     private WriteBehindTask writeBehindTask;
     private UnitOfWork unitOfWork;
     public HomiesLib() {
@@ -29,6 +31,7 @@ public final class HomiesLib extends JavaPlugin {
     public void onEnable() {
         configManager = new ConfigManager(this);
         menuManager = new MenuManager(this);
+        actionBarManager = new ActionBarManager(plugin);
         DatabaseConfig databaseConfig = configManager.loadConfig(DatabaseConfig.class);
 
         try {
