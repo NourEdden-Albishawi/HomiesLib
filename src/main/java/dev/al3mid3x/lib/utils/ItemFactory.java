@@ -1,12 +1,13 @@
 package dev.al3mid3x.lib.utils;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 
 public class ItemFactory {
     private final ItemStack itemStack;
-
     private final ItemMeta itemMeta;
 
     public ItemFactory(ItemStack stack) {
@@ -24,7 +25,15 @@ public class ItemFactory {
         return this;
     }
 
+    public ItemFactory setPlayerProfile(PlayerProfile profile) {
+        if (itemMeta instanceof SkullMeta) {
+            ((SkullMeta) itemMeta).setPlayerProfile(profile);
+        }
+        return this;
+    }
+
     public ItemStack complete() {
         this.itemStack.setItemMeta(this.itemMeta);
         return this.itemStack;
-    }}
+    }
+}
