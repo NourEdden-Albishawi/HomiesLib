@@ -8,7 +8,7 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 
 @Data public class LibItemMenu {
-    private final UUID uuid;
+    private final UUID uuid = UUID.randomUUID();
 
     private final int slot;
 
