@@ -25,7 +25,9 @@ Whether you're working on a private server or just curious about how Homies Base
 
 - **Optimized for Homies Base**  
   Built specifically for Homies Base, this library ensures smooth performance and reliability for your server's plugins.
-
+  
+- **Event Handling System**
+  Implements a custom event bus for flexible event management.
 ---
 
 ## Why HomiesLib? ❤️
@@ -34,8 +36,8 @@ Whether you're working on a private server or just curious about how Homies Base
 - **Easy to Use**: Intuitive APIs and clear documentation make it simple to integrate HomiesLib into your projects.
 - **Open Source**: HomiesLib is open for exploration, learning, and collaboration. Feel free to use it as inspiration for your own projects!
 
-## Quick Example
-Here's a quick example of how to use HomiesLib's configuration framework:
+## ⚙️ Configuration System
+The Configuration System provides a simple API for managing YAML files.
 
 ```java
 @ConfigFile(fileName = "config.yml")
@@ -44,6 +46,11 @@ public class MyConfig {
     public String welcomeMessage = "Welcome to Homies Base!";
 }
 
+```
+
+**Load the configuration**
+
+```java
 public class MyPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
@@ -54,7 +61,118 @@ public class MyPlugin extends JavaPlugin {
     }
 }
 ```
-## Contributing 🤝
+
+**Modify and Save the configuration**
+
+```java
+        config.welcomeMessage = "Hello From Main";
+        configManager.saveConfig(config);
+```
+
+## 🎯 Event Handling System
+HomiesLib includes a custom event bus that simplifies event handling.
+
+**Creating a Custom Event**
+
+```java
+public class CustomEvent extends LibEvent {
+    private final Player player;
+
+    public CustomEvent(Player player) {
+        this.player = player;
+    }
+
+    public Player getPlayer() {
+        return player;
+    }
+}
+```
+
+**Firing an Event Listener**
+
+```java
+HomiesEventBus eventBus = new HomiesEventBus();
+eventBus.fireEvent(new CustomEvent(player));
+
+```
+
+**Listening for an event**
+
+```java
+eventBus.registerListener(CustomEvent.class, event -> {
+event.getPlayer().sendMessage(ChatColor.YELLOW + "Hello from an external plugin!");
+});
+```
+
+## 📜 Menu System
+
+The Menu System allows easy creation and interaction with inventory-based GUIs.
+
+**Creating a Custom menu**
+
+```java
+public class AmazingMenu extends LibMenu {
+    public TestMenu(String name, int size, HomiesEventBus eventBus) {
+        super("My Amazing Menu", 9, eventBus);
+    }
+
+    @Override
+    protected int getMaxItemsPerPage() {
+        return 0; // change it when isPaginated() == true
+    }
+
+    @Override
+    protected boolean isPaginated() {
+        return false;
+    }
+
+    @Override
+    public List<LibItemMenu> getItems() {
+        List<LibItemMenu> items = Lists.newArrayList();
+        items.add(
+                new LibItemMenu(4, new ItemFactory(Material.STONE)
+                        .setDisplayName("Special Stone"), ((event, itemFactory) -> {
+                    event.setCancelled(true);
+                    event.getWhoClicked().sendMessage("You clicked on the special stone!");
+                    event.getWhoClicked().closeInventory();
+                })));
+        return items;
+    }
+}
+
+```
+
+## 🔧 Command System
+
+The Command System simplifies handling commands.
+
+**Create your command:**
+
+```java
+public class MyCommand extends LibCommand {
+
+    @Parameter(value = "hello", minArgs = 1, maxArgs = 2)
+    public void helloCommand(String arg1, String arg2) {
+        commandSender.sendMessage("Hello, " + arg1 + " and " + arg2 + "!");
+    }
+
+    @Parameter(value = "greet", minArgs = 1, maxArgs = 1)
+    public void greetCommand(String name) {
+        commandSender.sendMessage("Greetings, " + name + "!");
+    }
+}
+```
+
+**Register your command:**
+
+```java
+@Override
+public void onEnable() {
+    this.getCommand("mycommand").setExecutor(new MyCommand());
+}
+```
+
+## 🚀 Contributing 
 
 We welcome contributions from the community! Whether you're fixing a bug, adding a feature, or improving documentation, your help is appreciated. Here's how you can contribute:
 
@@ -115,7 +233,7 @@ If you have any questions or need help, feel free to open an issue or join our [
 
 Thank you for contributing to HomiesLib! 🎉
 
-## License 📜
+## 📜 License 
 HomiesLib is licensed under the MIT License. See the [LICENSE](https://github.com/NourEdden-Albishawi/HomiesLib/blob/master/LICENSE) file for more details.
 
 
