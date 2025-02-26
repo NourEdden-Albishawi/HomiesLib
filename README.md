@@ -182,7 +182,7 @@ We welcome contributions from the community! Whether you're fixing a bug, adding
 ### **2. Clone Your Fork**
 - Clone your forked repository to your local machine:
 ```bash
-  git clone https://github.com/YourUsername/HomiesLib.git
+  git clone https://github.com/NourEdden-Albishawi/HomiesLib.git
 ```
 ### **3. Create a New Branch**
 - Create a new branch for your changes:
