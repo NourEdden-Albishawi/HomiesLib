@@ -6,6 +6,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
+import java.util.List;
+
 public class ItemFactory {
     private final ItemStack itemStack;
     private final ItemMeta itemMeta;
@@ -22,6 +24,15 @@ public class ItemFactory {
 
     public ItemFactory setDisplayName(String name) {
         this.itemMeta.setDisplayName(name);
+        return this;
+    }
+
+    public ItemFactory setLore(List<String> lore){
+        this.itemMeta.setLore(lore);
+        return this;
+    }
+    public ItemFactory addLore(String lore){
+        this.itemMeta.getLore().add(lore);
         return this;
     }
 
