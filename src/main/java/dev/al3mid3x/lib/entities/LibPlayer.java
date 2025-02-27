@@ -12,18 +12,30 @@ public class LibPlayer {
 
     private final String name;
 
+    private UUID teamId;
+
     private int kills;
 
     private int deaths;
 
-    public int AddKills(int count) {
+    public int addKills(int count) {
         setKills(this.kills + count);
         return this.kills + count;
     }
 
-    public int AddDeaths(int count) {
+    public int addDeaths(int count) {
         setKills(this.deaths + count);
         return this.deaths + count;
+    }
+
+    public int removeKills(int count) {
+        setKills(this.kills - count);
+        return this.kills - count;
+    }
+
+    public int removeDeaths(int count) {
+        setKills(this.deaths - count);
+        return this.deaths - count;
     }
 }
 
