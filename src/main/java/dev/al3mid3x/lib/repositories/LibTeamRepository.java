@@ -20,7 +20,11 @@ public class LibTeamRepository {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
-                LibTeam team = new LibTeam(UUID.fromString(rs.getString("uuid")),rs.getString("name"),UUID.fromString(rs.getString("founderId")));
+                LibTeam team = new LibTeam(
+                        UUID.fromString(rs.getString("uuid")),
+                        rs.getString("name"),
+                        UUID.fromString(rs.getString("founderId")));
+
                 cache.put(team.getUuid(), team);
             }
         }
@@ -34,16 +38,14 @@ public class LibTeamRepository {
                 stmt.setString(1, team.getUuid().toString());
                 stmt.setString(2, team.getName());
                 stmt.setString(3, team.getFounderId().toString());
-                stmt.setString(4, team.getName());
-                stmt.setString(5, team.getFounderId().toString());
                 stmt.addBatch();
             }
             stmt.executeBatch();
         }
     }
 
-    public LibTeam getById(int id) {
-        return cache.get(id);
+    public LibTeam getById(UUID uuid) {
+        return cache.get(uuid);
     }
 
     public void addOrUpdate(LibTeam team) {
