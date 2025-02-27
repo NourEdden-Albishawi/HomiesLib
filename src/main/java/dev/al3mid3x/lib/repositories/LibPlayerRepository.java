@@ -24,20 +24,22 @@ public class LibPlayerRepository {
                 LibPlayer player = new LibPlayer(UUID.fromString(rs.getString("uuid")),rs.getString("name"));
                 player.setKills(rs.getInt("kills"));
                 player.setDeaths(rs.getInt("deaths"));
+                player.setTeamId(UUID.fromString(rs.getString("teamId")));
                 cache.put(player.getUuid(), player);
             }
         }
     }
 
     public void saveAll() throws SQLException {
-        String query = "INSERT INTO player_data (uuid, name, kills, deaths) VALUES (?, ?, ?, ?) " +
-                "ON CONFLICT(uuid) DO UPDATE SET name = ?, kills = ?, deaths = ?";
+        String query = "INSERT INTO player_data (uuid, name, kills, deaths, teamId) VALUES (?, ?, ?, ?, ?) " +
+                "ON CONFLICT(uuid) DO UPDATE SET name = ?, kills = ?, deaths = ?, teamId = ?";
         try (PreparedStatement stmt = connection.prepareStatement(query)) {
             for (LibPlayer player : cache.values()) {
                 stmt.setString(1, player.getUuid().toString());
                 stmt.setString(2, player.getName());
                 stmt.setInt(3, player.getKills());
                 stmt.setDouble(4, player.getDeaths());
+                stmt.setString(5, player.getTeamId().toString());
                 stmt.addBatch();
             }
             stmt.executeBatch();
