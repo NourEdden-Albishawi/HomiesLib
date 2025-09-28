@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>lib.homies.framework</groupId>
+        <artifactId>lib</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>homieslib-core</artifactId>
+    <name>homieslib-core</name>
+    <url>http://maven.apache.org</url>
+
+
+    <dependencies>
+        <!-- The core module should only depend on the API and other platform-agnostic libraries -->
+        <dependency>
+            <groupId>lib.homies.framework</groupId>
+            <artifactId>homieslib-api</artifactId>
+            <version>${project.version}</version>
+            <scope>compile</scope> <!-- Changed to compile as it's a required part of the core logic -->
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.30</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Reflections can be a useful tool for a core module, so we can keep it -->
+        <dependency>
+            <groupId>org.reflections</groupId>
+            <artifactId>reflections</artifactId>
+            <version>0.10.2</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- No special build configuration is needed here. The parent POM handles compilation. -->
+
+</project>
