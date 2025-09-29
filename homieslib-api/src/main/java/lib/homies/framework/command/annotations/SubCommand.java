@@ -23,4 +23,11 @@ public @interface SubCommand {
      * @return The subcommand description.
      */
     String description() default "";
+
+    /**
+     * The usage message for the subcommand.
+     *
+     * @return The usage message.
+     */
+    String usage() default "";
 }
