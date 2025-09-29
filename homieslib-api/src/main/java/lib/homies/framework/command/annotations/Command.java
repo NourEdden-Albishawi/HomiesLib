@@ -31,4 +31,11 @@ public @interface Command {
      * @return An array of command aliases.
      */
     String[] aliases() default {};
+
+    /**
+     * The usage message for the command.
+     *
+     * @return The usage message.
+     */
+    String usage() default "";
 }
