@@ -8,6 +8,7 @@ import java.util.List;
 public class SubcommandInfo {
     private final String name;
     private final String description;
+    private final String usage;
     private final int minArgs;
     private final List<String> argTypes;
     private final String permission;
@@ -16,13 +17,15 @@ public class SubcommandInfo {
      * Constructs a new SubcommandInfo instance.
      * @param name The name or pattern of the subcommand.
      * @param description A brief description of the subcommand.
+     * @param usage The usage message for the subcommand.
      * @param minArgs The minimum number of arguments required for the subcommand.
      * @param argTypes A list of string representations of the argument types.
      * @param permission The permission node required for this subcommand, or an empty string if none.
      */
-    public SubcommandInfo(String name, String description, int minArgs, List<String> argTypes, String permission) {
+    public SubcommandInfo(String name, String description, String usage, int minArgs, List<String> argTypes, String permission) {
         this.name = name;
         this.description = description;
+        this.usage = usage;
         this.minArgs = minArgs;
         this.argTypes = argTypes;
         this.permission = permission;
@@ -42,6 +45,15 @@ public class SubcommandInfo {
      */
     public String getDescription() {
         return description;
+    }
+
+    /**
+     * Gets the usage message for the subcommand.
+     *
+     * @return The usage message.
+     */
+    public String getUsage() {
+        return usage;
     }
 
     /**
