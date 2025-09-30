@@ -38,4 +38,18 @@ public @interface Command {
      * @return The usage message.
      */
     String usage() default "";
+
+    /**
+     * Whether this command can only be executed by a player.
+     *
+     * @return true if player-only, false otherwise.
+     */
+    boolean playerOnly() default false;
+
+    /**
+     * The message to send if a non-player tries to execute this command when playerOnly is true.
+     *
+     * @return The message to send.
+     */
+    String playerOnlyMessage() default "This command can only be run by a player.";
 }
