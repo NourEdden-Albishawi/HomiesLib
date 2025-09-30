@@ -1,8 +1,7 @@
 package lib.homies.framework.spigot.command;
 
-import lib.homies.framework.command.annotations.SubCommand;
-import lib.homies.framework.command.CommandManager;
 import lib.homies.framework.command.annotations.Command;
+import lib.homies.framework.command.annotations.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandMap;
@@ -11,14 +10,16 @@ import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.util.List;
 import java.util.logging.Level;
 
 /**
- * Spigot-specific implementation of the {@link CommandManager} interface.
- * This class handles the registration of annotation-driven commands with the Bukkit/Spigot server.
- * It uses reflection to access the server's CommandMap and dynamically loads generated command dispatchers.
+ * Handles the automatic registration of all annotation-driven commands at runtime.
+ * This manager discovers commands via the annotation processor-generated registry,
+ * removing the need for manual registration in plugin.yml.
  */
-public class SpigotCommandManager implements CommandManager {
+public class SpigotCommandManager {
 
     private final Plugin plugin;
     private final CommandMap commandMap;
@@ -27,7 +28,7 @@ public class SpigotCommandManager implements CommandManager {
     /**
      * Constructs a new SpigotCommandManager.
      * Initializes access to the Bukkit CommandMap and the PluginCommand constructor via reflection.
-     * @param plugin The {@link Plugin} instance of the framework.
+     * @param plugin The {@link Plugin} instance that owns these commands.
      * @throws RuntimeException if access to Bukkit's internal command system fails.
      */
     public SpigotCommandManager(Plugin plugin) {
@@ -39,52 +40,85 @@ public class SpigotCommandManager implements CommandManager {
 
             this.pluginCommandConstructor = PluginCommand.class.getDeclaredConstructor(String.class, Plugin.class);
             this.pluginCommandConstructor.setAccessible(true);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize SpigotCommandManager: Could not access CommandMap.", e);
+        } catch (NoSuchFieldException | IllegalAccessException | NoSuchMethodException e) {
+            throw new RuntimeException("Failed to initialize SpigotCommandManager: Could not access Bukkit internals.", e);
         }
     }
 
     /**
-     * Registers an object as a command handler with the Spigot server.
-     * The object's class must be annotated with {@link Command}.
-     * This method dynamically loads the annotation processor-generated dispatcher class
-     * and registers it as a {@link CommandExecutor} for the specified command.
-     *
-     * @param commandObject The instance of the command class to register.
-     *                      This object should contain methods annotated with {@link Command} and {@link SubCommand}.
+     * Discovers and registers all commands annotated with @Command.
+     * This method should be called once during the plugin's onEnable phase.
      */
-    @Override
-    public void registerCommand(Object commandObject) {
-        Class<?> commandClass = commandObject.getClass();
-        if (!commandClass.isAnnotationPresent(Command.class)) {
-            plugin.getLogger().warning("Class " + commandClass.getSimpleName() + " is not annotated with @Command. Cannot register.");
-            return;
-        }
-
-        // The annotation processor generates a dispatcher class with this naming convention
-        String generatedClassName = commandClass.getName() + "_GeneratedDispatcher";
+    public void registerAllCommands() {
+        plugin.getLogger().info("Starting automatic command registration...");
         try {
-            // FIX: Use the classloader of the commandObject to load the generated class
-            Class<?> generatedClass = commandClass.getClassLoader().loadClass(generatedClassName);
-            // The generated dispatcher has a constructor that takes an instance of the command class
-            Constructor<?> constructor = generatedClass.getConstructor(commandClass);
-            CommandExecutor executor = (CommandExecutor) constructor.newInstance(commandObject);
+            // Use the plugin's classloader to find the generated registry
+            Class<?> registryClass = Class.forName("lib.homies.framework.spigot.command.HomiesCommandRegistry", true, plugin.getClass().getClassLoader());
+            Field commandClassesField = registryClass.getField("COMMAND_CLASS_NAMES");
+            @SuppressWarnings("unchecked")
+            List<String> commandClassNames = (List<String>) commandClassesField.get(null);
 
+            if (commandClassNames.isEmpty()) {
+                plugin.getLogger().info("No commands found to register.");
+                return;
+            }
+
+            for (String className : commandClassNames) {
+                registerCommand(className);
+            }
+            plugin.getLogger().info("Successfully registered " + commandClassNames.size() + " command(s).");
+
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().info("No HomiesCommandRegistry found. Skipping automatic command registration. This is normal if no commands are defined.");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "An error occurred during automatic command registration.", e);
+        }
+    }
+
+    private void registerCommand(String commandClassName) {
+        try {
+            Class<?> commandClass = Class.forName(commandClassName, true, plugin.getClass().getClassLoader());
             Command commandAnnotation = commandClass.getAnnotation(Command.class);
 
-            // Create and configure a Bukkit PluginCommand instance
+            if (commandAnnotation == null) {
+                plugin.getLogger().warning("Class " + commandClassName + " is listed in the registry but is not annotated with @Command. Skipping.");
+                return;
+            }
+
+            // Instantiate the command class
+            Object commandInstance;
+            try {
+                commandInstance = commandClass.getConstructor().newInstance();
+            } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                     NoSuchMethodException e) {
+                plugin.getLogger().severe("Failed to instantiate command class: " + commandClassName + ". Does it have a public no-arg constructor?");
+                return;
+            }
+
+            // Load the generated dispatcher
+            String dispatcherClassName = commandClass.getName() + "_GeneratedDispatcher";
+            Class<?> dispatcherClass = Class.forName(dispatcherClassName, true, plugin.getClass().getClassLoader());
+            Constructor<?> dispatcherConstructor = dispatcherClass.getConstructor(commandClass);
+            CommandExecutor executor = (CommandExecutor) dispatcherConstructor.newInstance(commandInstance);
+
+            // Create and register the Bukkit command
             PluginCommand command = pluginCommandConstructor.newInstance(commandAnnotation.name(), plugin);
             command.setExecutor(executor);
             command.setAliases(java.util.Arrays.asList(commandAnnotation.aliases()));
             command.setDescription(commandAnnotation.description());
+            command.setUsage(commandAnnotation.usage().replace("<command>", commandAnnotation.name()));
 
-            // Register the command with the server's CommandMap
-            commandMap.register(plugin.getName(), command);
+            // Set permission and permission message if present on the class
+            Permission permission = commandClass.getAnnotation(Permission.class);
+            if (permission != null) {
+                command.setPermission(permission.value());
+                command.setPermissionMessage(permission.message());
+            }
 
-        } catch (ClassNotFoundException e) {
-            plugin.getLogger().severe("Could not find generated dispatcher for " + commandClass.getSimpleName() + ". Did the annotation processor run? " + e.getMessage());
+            commandMap.register(plugin.getName().toLowerCase(), command);
+
         } catch (Exception e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to register command " + commandClass.getSimpleName(), e);
+            plugin.getLogger().log(Level.SEVERE, "Failed to register command from class: " + commandClassName, e);
         }
     }
 }
