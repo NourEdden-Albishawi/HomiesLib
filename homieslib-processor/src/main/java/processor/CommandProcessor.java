@@ -68,6 +68,14 @@ public class CommandProcessor extends AbstractProcessor {
 
         onCommandMethodBuilder.beginControlFlow("if (args.length == 0)");
         if (defaultCommandMethod != null) {
+            Command defaultCmdAnnotation = defaultCommandMethod.getAnnotation(Command.class);
+            if (defaultCmdAnnotation.playerOnly()) {
+                onCommandMethodBuilder.beginControlFlow("if (!(sender instanceof $T))", PLAYER_TYPE)
+                        .addStatement("sender.sendMessage($S)", defaultCmdAnnotation.playerOnlyMessage())
+                        .addStatement("return true")
+                        .endControlFlow();
+            }
+
             onCommandMethodBuilder.beginControlFlow("try");
             executeCommandMethod(onCommandMethodBuilder, defaultCommandMethod, "commandInstance", true);
             onCommandMethodBuilder.nextControlFlow("catch ($T e)", Exception.class)
@@ -108,6 +116,14 @@ public class CommandProcessor extends AbstractProcessor {
 
                 String controlFlow = (i == 0) ? "if" : "else if";
                 onCommandMethodBuilder.beginControlFlow("$L (args.length - 1 == $L)", controlFlow, requiredArgs);
+
+                SubCommand subCmdAnnotation = methodElement.getAnnotation(SubCommand.class);
+                if (subCmdAnnotation.playerOnly()) {
+                    onCommandMethodBuilder.beginControlFlow("if (!(sender instanceof $T))", PLAYER_TYPE)
+                            .addStatement("sender.sendMessage($S)", subCmdAnnotation.playerOnlyMessage())
+                            .addStatement("return true")
+                            .endControlFlow();
+                }
 
                 executeCommandMethod(onCommandMethodBuilder, methodElement, "commandInstance", false);
 
@@ -165,7 +181,7 @@ public class CommandProcessor extends AbstractProcessor {
         if (perm != null) {
             builder.beginControlFlow("if (!sender.hasPermission($S))", perm.value())
                     .addStatement("sender.sendMessage($S)", perm.message())
-                    .addStatement("return")
+                    .addStatement("return true")
                     .endControlFlow();
         }
 
@@ -179,8 +195,8 @@ public class CommandProcessor extends AbstractProcessor {
 
             if (paramType.equals(HOMIES_PLAYER_TYPE) && !senderInjected) {
                 builder.beginControlFlow("if (!(sender instanceof $T))", PLAYER_TYPE)
-                        .addStatement("sender.sendMessage(\"This command must be run by a player.\")")
-                        .addStatement("return")
+                        .addStatement("sender.sendMessage(\"This command can only be run by a player.\")")
+                        .addStatement("return true")
                         .endControlFlow();
                 parameterInvocations.add(CodeBlock.of("new $T(($T) sender)", SPIGOT_PLAYER_TYPE, PLAYER_TYPE));
                 senderInjected = true;
@@ -188,7 +204,7 @@ public class CommandProcessor extends AbstractProcessor {
                 if (isDefaultCommand) {
                     processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Default command methods can only accept an injectable sender parameter (e.g., HomiesPlayer).", param);
                     builder.addStatement("sender.sendMessage(\"§cError: The default command is configured incorrectly.\")");
-                    builder.addStatement("return");
+                    builder.addStatement("return true");
                     return;
                 }
 
@@ -196,7 +212,7 @@ public class CommandProcessor extends AbstractProcessor {
                     builder.addStatement("$T $L = $T.getPlayer(args[$L])", PLAYER_TYPE, paramName, Bukkit.class, stringArgIndex);
                     builder.beginControlFlow("if ($L == null)", paramName)
                             .addStatement("sender.sendMessage(\"Player not found: \" + args[$L])", stringArgIndex)
-                            .addStatement("return")
+                            .addStatement("return true")
                             .endControlFlow();
                     parameterInvocations.add(CodeBlock.of("new $T($L)", SPIGOT_PLAYER_TYPE, paramName));
                     stringArgIndex++;
@@ -209,13 +225,13 @@ public class CommandProcessor extends AbstractProcessor {
                             .addStatement("$L = $T.parseInt(args[$L])", paramName, Integer.class, stringArgIndex)
                             .nextControlFlow("catch ($T e)", NumberFormatException.class)
                             .addStatement("sender.sendMessage(\"Invalid number: \" + args[$L])", stringArgIndex)
-                            .addStatement("return")
+                            .addStatement("return true")
                             .endControlFlow();
                     parameterInvocations.add(CodeBlock.of("$L", paramName));
                     stringArgIndex++;
                 } else {
                     processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Unsupported parameter type: " + paramType, param);
-                    builder.addStatement("return");
+                    builder.addStatement("return true");
                     break;
                 }
             }
