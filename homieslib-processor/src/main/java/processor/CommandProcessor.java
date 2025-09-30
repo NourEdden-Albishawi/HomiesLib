@@ -66,14 +66,26 @@ public class CommandProcessor extends AbstractProcessor {
                 .findFirst()
                 .orElse(null);
 
+        onCommandMethodBuilder.beginControlFlow("if (args.length == 0)");
         if (defaultCommandMethod != null) {
-            onCommandMethodBuilder.beginControlFlow("if (args.length == 0)");
-            executeCommandMethod(onCommandMethodBuilder, defaultCommandMethod, "commandInstance");
-            onCommandMethodBuilder.addStatement("return true");
+            onCommandMethodBuilder.beginControlFlow("try");
+            executeCommandMethod(onCommandMethodBuilder, defaultCommandMethod, "commandInstance", true);
+            onCommandMethodBuilder.nextControlFlow("catch ($T e)", Exception.class)
+                    .addStatement("sender.sendMessage(\"§cAn unexpected internal error occurred.\")")
+                    .addStatement("e.printStackTrace()");
             onCommandMethodBuilder.endControlFlow();
+        } else {
+            Command commandAnnotation = commandClass.getAnnotation(Command.class);
+            String usage = commandAnnotation.usage();
+            if (usage.isEmpty()) {
+                usage = "§cThis command requires a subcommand. Use /" + "label" + " help for available commands.";
+            }
+            onCommandMethodBuilder.addStatement("sender.sendMessage($S)", usage);
         }
+        onCommandMethodBuilder.addStatement("return true");
+        onCommandMethodBuilder.endControlFlow();
 
-        onCommandMethodBuilder.addStatement("String subCommandName = args.length > 0 ? args[0].toLowerCase() : \"\"");
+        onCommandMethodBuilder.addStatement("String subCommandName = args[0].toLowerCase()");
         onCommandMethodBuilder.beginControlFlow("switch (subCommandName)");
 
         Map<String, List<ExecutableElement>> subCommandsByName = commandClass.getEnclosedElements().stream()
@@ -97,7 +109,7 @@ public class CommandProcessor extends AbstractProcessor {
                 String controlFlow = (i == 0) ? "if" : "else if";
                 onCommandMethodBuilder.beginControlFlow("$L (args.length - 1 == $L)", controlFlow, requiredArgs);
 
-                executeCommandMethod(onCommandMethodBuilder, methodElement, "commandInstance");
+                executeCommandMethod(onCommandMethodBuilder, methodElement, "commandInstance", false);
 
                 onCommandMethodBuilder.addStatement("return true");
                 onCommandMethodBuilder.endControlFlow();
@@ -148,7 +160,7 @@ public class CommandProcessor extends AbstractProcessor {
         JavaFile.builder(packageName, generatedClass).build().writeTo(processingEnv.getFiler());
     }
 
-    private void executeCommandMethod(MethodSpec.Builder builder, ExecutableElement method, String instanceName) {
+    private void executeCommandMethod(MethodSpec.Builder builder, ExecutableElement method, String instanceName, boolean isDefaultCommand) {
         Permission perm = method.getAnnotation(Permission.class);
         if (perm != null) {
             builder.beginControlFlow("if (!sender.hasPermission($S))", perm.value())
@@ -158,7 +170,7 @@ public class CommandProcessor extends AbstractProcessor {
         }
 
         List<CodeBlock> parameterInvocations = new ArrayList<>();
-        int stringArgIndex = 1;
+        int stringArgIndex = isDefaultCommand ? 0 : 1;
         boolean senderInjected = false;
 
         for (VariableElement param : method.getParameters()) {
@@ -172,31 +184,40 @@ public class CommandProcessor extends AbstractProcessor {
                         .endControlFlow();
                 parameterInvocations.add(CodeBlock.of("new $T(($T) sender)", SPIGOT_PLAYER_TYPE, PLAYER_TYPE));
                 senderInjected = true;
-            } else if (paramType.equals(HOMIES_PLAYER_TYPE)) {
-                builder.addStatement("$T $L = $T.getPlayer(args[$L])", PLAYER_TYPE, paramName, Bukkit.class, stringArgIndex);
-                builder.beginControlFlow("if ($L == null)", paramName)
-                        .addStatement("sender.sendMessage(\"Player not found: \" + args[$L])", stringArgIndex)
-                        .addStatement("return")
-                        .endControlFlow();
-                parameterInvocations.add(CodeBlock.of("new $T($L)", SPIGOT_PLAYER_TYPE, paramName));
-                stringArgIndex++;
-            } else if (paramType.equals(ClassName.get(String.class))) {
-                parameterInvocations.add(CodeBlock.of("args[$L]", stringArgIndex));
-                stringArgIndex++;
-            } else if (paramType.equals(TypeName.INT)) {
-                builder.addStatement("int $L = 0", paramName);
-                builder.beginControlFlow("try")
-                        .addStatement("$L = $T.parseInt(args[$L])", paramName, Integer.class, stringArgIndex)
-                        .nextControlFlow("catch ($T e)", NumberFormatException.class)
-                        .addStatement("sender.sendMessage(\"Invalid number: \" + args[$L])", stringArgIndex)
-                        .addStatement("return")
-                        .endControlFlow();
-                parameterInvocations.add(CodeBlock.of("$L", paramName));
-                stringArgIndex++;
             } else {
-                processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Unsupported parameter type in @SubCommand: " + paramType, param);
-                builder.addStatement("return");
-                break;
+                if (isDefaultCommand) {
+                    processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Default command methods can only accept an injectable sender parameter (e.g., HomiesPlayer).", param);
+                    builder.addStatement("sender.sendMessage(\"§cError: The default command is configured incorrectly.\")");
+                    builder.addStatement("return");
+                    return;
+                }
+
+                if (paramType.equals(HOMIES_PLAYER_TYPE)) {
+                    builder.addStatement("$T $L = $T.getPlayer(args[$L])", PLAYER_TYPE, paramName, Bukkit.class, stringArgIndex);
+                    builder.beginControlFlow("if ($L == null)", paramName)
+                            .addStatement("sender.sendMessage(\"Player not found: \" + args[$L])", stringArgIndex)
+                            .addStatement("return")
+                            .endControlFlow();
+                    parameterInvocations.add(CodeBlock.of("new $T($L)", SPIGOT_PLAYER_TYPE, paramName));
+                    stringArgIndex++;
+                } else if (paramType.equals(ClassName.get(String.class))) {
+                    parameterInvocations.add(CodeBlock.of("args[$L]", stringArgIndex));
+                    stringArgIndex++;
+                } else if (paramType.equals(TypeName.INT)) {
+                    builder.addStatement("int $L = 0", paramName);
+                    builder.beginControlFlow("try")
+                            .addStatement("$L = $T.parseInt(args[$L])", paramName, Integer.class, stringArgIndex)
+                            .nextControlFlow("catch ($T e)", NumberFormatException.class)
+                            .addStatement("sender.sendMessage(\"Invalid number: \" + args[$L])", stringArgIndex)
+                            .addStatement("return")
+                            .endControlFlow();
+                    parameterInvocations.add(CodeBlock.of("$L", paramName));
+                    stringArgIndex++;
+                } else {
+                    processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Unsupported parameter type: " + paramType, param);
+                    builder.addStatement("return");
+                    break;
+                }
             }
         }
 
@@ -246,7 +267,7 @@ public class CommandProcessor extends AbstractProcessor {
                         ? CodeBlock.of("$T.of()", List.class)
                         : CodeBlock.of("$T.of($L)", List.class, paramTypes.stream().map(p -> CodeBlock.of("$S", p)).collect(CodeBlock.joining(", ")));
 
-                listInitializer.add("    new $T($S, $S, $L, $L, $S, $S)",
+                listInitializer.add("    new $T($S, $S, $S, $L, $L, $S)",
                         SUBCOMMAND_INFO_TYPE,
                         subCommandAnnotation.value(),
                         subCommandAnnotation.description(),
