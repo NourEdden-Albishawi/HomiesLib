@@ -1,6 +1,4 @@
-package lib.homies.framework.texture.annotations;
-
-import org.bukkit.Material;
+package lib.homies.framework.texture;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -15,16 +13,15 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 public @interface CustomTexture {
     /**
-     * The base Material for the item (e.g., Material.PAPER).
-     *
-     * @return The material.
+     * The base Material for the item (e.g., "PAPER").
+     * This should match the Bukkit Material enum name.
+     * @return The material name.
      */
-    Material material();
+    String material();
 
     /**
      * The CustomModelData value.
      * This integer corresponds to a model in the server's resource pack.
-     *
      * @return The CustomModelData value.
      */
     int value();
