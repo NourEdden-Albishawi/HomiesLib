@@ -27,20 +27,66 @@ public class CommandProcessor extends AbstractProcessor {
     private final TypeName SPIGOT_PLAYER_TYPE = ClassName.get("lib.homies.framework.spigot.player", "SpigotPlayer");
     private final TypeName SUBCOMMAND_INFO_TYPE = ClassName.get(SubcommandInfo.class);
 
+    private final Set<TypeElement> discoveredCommandClasses = new LinkedHashSet<>();
+
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         for (Element element : roundEnv.getElementsAnnotatedWith(Command.class)) {
             if (element.getKind() != ElementKind.CLASS) continue;
 
             TypeElement typeElement = (TypeElement) element;
+            discoveredCommandClasses.add(typeElement);
+
             try {
                 generateCommandDispatcher(typeElement);
                 generateMetadataClass(typeElement);
             } catch (Exception e) {
-                processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Could not generate command dispatcher: " + e.getMessage(), element);
+                processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Could not generate command dispatcher for " + typeElement.getSimpleName() + ": " + e.getMessage(), element);
             }
         }
+
+        if (roundEnv.processingOver()) {
+            try {
+                generateCommandRegistry();
+            } catch (IOException e) {
+                processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR, "Could not generate command registry: " + e.getMessage());
+            }
+        }
+
         return true;
+    }
+
+    private void generateCommandRegistry() throws IOException {
+        if (discoveredCommandClasses.isEmpty()) {
+            return; // No commands, no registry needed.
+        }
+
+        String packageName = "lib.homies.framework.spigot.command";
+        String generatedClassName = "HomiesCommandRegistry";
+
+        ParameterizedTypeName listOfStrings = ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(String.class));
+
+        CodeBlock.Builder listInitializer = CodeBlock.builder().add("$T.of(\n", List.class);
+        int i = 0;
+        for (TypeElement te : discoveredCommandClasses) {
+            listInitializer.add("    $S", te.getQualifiedName().toString());
+            if (i < discoveredCommandClasses.size() - 1) {
+                listInitializer.add(",\n");
+            }
+            i++;
+        }
+        listInitializer.add("\n)");
+
+        FieldSpec commandClassesField = FieldSpec.builder(listOfStrings, "COMMAND_CLASS_NAMES", Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                .initializer(listInitializer.build())
+                .build();
+
+        TypeSpec registryClass = TypeSpec.classBuilder(generatedClassName)
+                .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                .addField(commandClassesField)
+                .build();
+
+        JavaFile.builder(packageName, registryClass).build().writeTo(processingEnv.getFiler());
     }
 
     private void generateCommandDispatcher(TypeElement commandClass) throws IOException {
@@ -86,9 +132,10 @@ public class CommandProcessor extends AbstractProcessor {
             Command commandAnnotation = commandClass.getAnnotation(Command.class);
             String usage = commandAnnotation.usage();
             if (usage.isEmpty()) {
-                usage = "§cThis command requires a subcommand. Use /" + "label" + " help for available commands.";
+                onCommandMethodBuilder.addStatement("sender.sendMessage(\"§cThis command requires a subcommand. Use /\" + label + \" help for available commands.\")");
+            } else {
+                onCommandMethodBuilder.addStatement("sender.sendMessage($S.replace(\"<command>\", label))", usage);
             }
-            onCommandMethodBuilder.addStatement("sender.sendMessage($S)", usage);
         }
         onCommandMethodBuilder.addStatement("return true");
         onCommandMethodBuilder.endControlFlow();
@@ -131,13 +178,14 @@ public class CommandProcessor extends AbstractProcessor {
                 onCommandMethodBuilder.endControlFlow();
             }
 
-            String usageMessage = overloads.get(0).getAnnotation(SubCommand.class).usage();
-            if (usageMessage.isEmpty()) {
-                usageMessage = "Invalid arguments for command /" + "label" + " " + subCommandName;
+            String usageTemplate = overloads.get(0).getAnnotation(SubCommand.class).usage();
+            onCommandMethodBuilder.beginControlFlow("else");
+            if (usageTemplate.isEmpty()) {
+                onCommandMethodBuilder.addStatement("sender.sendMessage(\"Invalid arguments for command /\" + label + \" \" + $S)", subCommandName);
+            } else {
+                onCommandMethodBuilder.addStatement("sender.sendMessage($S.replace(\"<command>\", label).replace(\"<subcommand>\", $S))", usageTemplate, subCommandName);
             }
-            onCommandMethodBuilder.beginControlFlow("else")
-                    .addStatement("sender.sendMessage($S)", usageMessage)
-                    .endControlFlow();
+            onCommandMethodBuilder.endControlFlow();
 
             onCommandMethodBuilder.nextControlFlow("catch ($T e)", Exception.class)
                     .addStatement("sender.sendMessage(\"§cAn unexpected internal error occurred.\")")
@@ -152,9 +200,10 @@ public class CommandProcessor extends AbstractProcessor {
         Command commandAnnotation = commandClass.getAnnotation(Command.class);
         String usage = commandAnnotation.usage();
         if (usage.isEmpty()) {
-            usage = "§cUnknown subcommand. Use /" + "label" + " help for available commands.";
+            onCommandMethodBuilder.addStatement("sender.sendMessage(\"§cUnknown subcommand. Use /\" + label + \" help for available commands.\")");
+        } else {
+            onCommandMethodBuilder.addStatement("sender.sendMessage($S.replace(\"<command>\", label))", usage);
         }
-        onCommandMethodBuilder.addStatement("sender.sendMessage($S)", usage);
         onCommandMethodBuilder.addStatement("break");
         onCommandMethodBuilder.endControlFlow();
 
