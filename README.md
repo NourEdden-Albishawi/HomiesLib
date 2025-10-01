@@ -153,7 +153,6 @@ This example demonstrates subcommands, permissions, parameter injection, and exp
 package com.yourcompany.commands;
 
 import lib.homies.framework.HomiesLib;
-import lib.homies.framework.command.annotations.*;
 import lib.homies.framework.player.HomiesPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -198,8 +197,8 @@ public class GamemodeCommand {
     }
 
     // 4. Another subcommand: `/gamemode survival`
-    @SubCommand(value = "survival", aliases = {"0", _s"}, description = "Set your gamemode to Survival.")
-            @Permission("myplugin.gamemode.survival")
+    @SubCommand(value = "survival", aliases = {"0", "_s"}, description = "Set your gamemode to Survival.")
+    @Permission("myplugin.gamemode.survival")
     public void onSurvival(HomiesPlayer sender) {
         Player bukkitPlayer = sender.getAs(Player.class);
         bukkitPlayer.setGameMode(GameMode.SURVIVAL);
