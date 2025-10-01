@@ -15,10 +15,10 @@ import java.lang.annotation.Target;
 public @interface Command {
     /**
      * The name of the command (e.g., "mycommand").
-     * This will be the primary command string used by players.
+     * This is required when annotating a class, but ignored on a method.
      * @return The command name.
      */
-    String name();
+    String name() default "";
 
     /**
      * A brief description of the command.
