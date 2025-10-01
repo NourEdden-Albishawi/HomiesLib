@@ -19,6 +19,13 @@ public @interface SubCommand {
     String value();
 
     /**
+     * An array of aliases for the subcommand.
+     *
+     * @return An array of subcommand aliases.
+     */
+    String[] aliases() default {};
+
+    /**
      * A brief description of the subcommand.
      * @return The subcommand description.
      */
