@@ -3,9 +3,11 @@ package lib.homies.framework.spigot.command;
 import lib.homies.framework.command.annotations.Command;
 import lib.homies.framework.command.annotations.Permission;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Constructor;
@@ -54,9 +56,13 @@ public class SpigotCommandManager {
         try {
             // Use the plugin's classloader to find the generated registry
             Class<?> registryClass = Class.forName("lib.homies.framework.spigot.command.HomiesCommandRegistry", true, plugin.getClass().getClassLoader());
+            java.net.URL location = registryClass.getProtectionDomain().getCodeSource().getLocation();
+            plugin.getLogger().info("Loaded HomiesCommandRegistry from: " + location.getFile());
             Field commandClassesField = registryClass.getField("COMMAND_CLASS_NAMES");
             @SuppressWarnings("unchecked")
             List<String> commandClassNames = (List<String>) commandClassesField.get(null);
+
+            plugin.getLogger().info("Discovered command classes: " + commandClassNames);
 
             if (commandClassNames.isEmpty()) {
                 plugin.getLogger().info("No commands found to register.");
@@ -85,6 +91,12 @@ public class SpigotCommandManager {
                 return;
             }
 
+            String commandName = commandAnnotation.name();
+            if (commandName == null || commandName.isEmpty()) {
+                plugin.getLogger().severe("Failed to register command from class " + commandClassName + ": @Command annotation on the class is missing a 'name'.");
+                return;
+            }
+
             // Instantiate the command class
             Object commandInstance;
             try {
@@ -102,17 +114,31 @@ public class SpigotCommandManager {
             CommandExecutor executor = (CommandExecutor) dispatcherConstructor.newInstance(commandInstance);
 
             // Create and register the Bukkit command
-            PluginCommand command = pluginCommandConstructor.newInstance(commandAnnotation.name(), plugin);
+            PluginCommand command = pluginCommandConstructor.newInstance(commandName, plugin);
             command.setExecutor(executor);
             command.setAliases(java.util.Arrays.asList(commandAnnotation.aliases()));
             command.setDescription(commandAnnotation.description());
-            command.setUsage(commandAnnotation.usage().replace("<command>", commandAnnotation.name()));
+            command.setUsage(ChatColor.translateAlternateColorCodes('&', commandAnnotation.usage().replace("<command>", commandName)));
 
             // Set permission and permission message if present on the class
             Permission permission = commandClass.getAnnotation(Permission.class);
             if (permission != null) {
                 command.setPermission(permission.value());
-                command.setPermissionMessage(permission.message());
+                command.setPermissionMessage(ChatColor.translateAlternateColorCodes('&', permission.message()));
+            }
+
+            // Load and set the generated tab completer, if it exists
+            String tabCompleterClassName = commandClass.getName() + "_GeneratedTabCompleter";
+            try {
+                Class<?> tabCompleterClass = Class.forName(tabCompleterClassName, true, plugin.getClass().getClassLoader());
+                Constructor<?> tabCompleterConstructor = tabCompleterClass.getConstructor(commandClass);
+                TabCompleter tabCompleter = (TabCompleter) tabCompleterConstructor.newInstance(commandInstance);
+                command.setTabCompleter(tabCompleter);
+            } catch (ClassNotFoundException e) {
+                // No tab completer generated for this command, which is fine.
+                plugin.getLogger().fine("No tab completer found for " + commandClassName + ".");
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed to load or set tab completer for " + commandClassName, e);
             }
 
             commandMap.register(plugin.getName().toLowerCase(), command);
