@@ -1,6 +1,5 @@
 package lib.homies.framework;
 
-import lib.homies.framework.command.CommandManager;
 import lib.homies.framework.config.ConfigManager;
 import lib.homies.framework.cooldown.CooldownService;
 import lib.homies.framework.database.DatabaseService;
@@ -25,7 +24,6 @@ public final class HomiesLib {
     private static DatabaseService databaseService;
     private static ConfigManager configManager;
     private static EventBus eventBus;
-    private static CommandManager commandManager;
     private static MiniGameManager miniGameManager;
     private static PlayerDataService playerDataService;
     private static CooldownService cooldownService;
@@ -121,22 +119,6 @@ public final class HomiesLib {
      */
     public static void setEventBus(EventBus eventBus) {
         HomiesLib.eventBus = eventBus;
-    }
-
-    /**
-     * Retrieves the CommandManager service.
-     * @return The CommandManager instance.
-     */
-    public static CommandManager getCommandManager() {
-        return commandManager;
-    }
-
-    /**
-     * Sets the CommandManager service. Intended for internal framework use during initialization.
-     * @param commandManager The CommandManager instance to set.
-     */
-    public static void setCommandManager(CommandManager commandManager) {
-        HomiesLib.commandManager = commandManager;
     }
 
     /**
