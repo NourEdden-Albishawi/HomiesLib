@@ -1,6 +1,7 @@
 package lib.homies.framework.spigot.menu;
 
 import lib.homies.framework.HomiesLib;
+import lib.homies.framework.events.MenuReloadEvent;
 import lib.homies.framework.menu.HomiesMenu;
 import lib.homies.framework.menu.HomiesMenuItem;
 import lib.homies.framework.menu.MenuManager;
@@ -11,19 +12,13 @@ import lib.homies.framework.spigot.utils.SpigotTextUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.Plugin;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
@@ -46,6 +41,8 @@ public class SpigotMenuManager implements MenuManager, Listener {
     public SpigotMenuManager(Plugin plugin) {
         this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        // Register this manager to listen for custom events
+        HomiesLib.getEventBus().subscribe(MenuReloadEvent.class, this::onMenuReload);
     }
 
     /**
@@ -172,7 +169,7 @@ public class SpigotMenuManager implements MenuManager, Listener {
      * Delegates the click to the currently open {@link HomiesMenu} and its {@link HomiesMenuItem}.
      * @param event The Bukkit InventoryClickEvent.
      */
-    @EventHandler
+    @org.bukkit.event.EventHandler // Use Bukkit's EventHandler for Bukkit events
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
@@ -198,7 +195,7 @@ public class SpigotMenuManager implements MenuManager, Listener {
      * Notifies the {@link HomiesMenu} that it has been closed for the player.
      * @param event The Bukkit InventoryCloseEvent.
      */
-    @EventHandler
+    @org.bukkit.event.EventHandler // Use Bukkit's EventHandler for Bukkit events
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player)) return;
         Player player = (Player) event.getPlayer();
@@ -208,5 +205,45 @@ public class SpigotMenuManager implements MenuManager, Listener {
             HomiesPlayer homiesPlayer = new SpigotPlayer(player);
             closedMenu.handleClose(homiesPlayer);
         }
+    }
+
+    /**
+     * Handles the {@link MenuReloadEvent} to refresh all currently open menus.
+     * This method is subscribed to the custom event bus.
+     *
+     * @param event The MenuReloadEvent.
+     */
+    public void onMenuReload(MenuReloadEvent event) {
+        plugin.getLogger().info("Received MenuReloadEvent. Refreshing open menus...");
+        for (Map.Entry<UUID, HomiesMenu> entry : openMenus.entrySet()) {
+            UUID playerUUID = entry.getKey();
+            HomiesMenu menu = entry.getValue();
+            Player player = Bukkit.getPlayer(playerUUID);
+
+            if (player != null && player.isOnline() && player.getOpenInventory().getTopInventory() != null) {
+                HomiesPlayer homiesPlayer = new SpigotPlayer(player);
+                menu.refresh(); // Call the menu's refresh logic
+
+                // Re-create and update the inventory for the player
+                Inventory currentOpenInventory = player.getOpenInventory().getTopInventory();
+                currentOpenInventory.clear(); // Clear old items
+
+                // Populate with new items from the refreshed menu
+                Map<Integer, HomiesMenuItem> newItems = menu.getItems(homiesPlayer);
+                for (Map.Entry<Integer, HomiesMenuItem> itemEntry : newItems.entrySet()) {
+                    int slot = itemEntry.getKey();
+                    HomiesMenuItem menuItem = itemEntry.getValue();
+                    if (menuItem.getItemStack(homiesPlayer) instanceof SpigotItemStack) {
+                        currentOpenInventory.setItem(slot, ((SpigotItemStack) menuItem.getItemStack(homiesPlayer)).getItemStack());
+                    }
+                }
+                // Update the title if it changed (requires closing and re-opening for Bukkit API)
+                // For now, we'll just update contents. If title changes are critical, a full re-open might be needed.
+                // player.openInventory(Bukkit.createInventory(null, menu.getSize(), textUtils.colorize(menu.getTitle(homiesPlayer))));
+                // player.getOpenInventory().setCursor(null); // Clear cursor if any
+                // player.updateInventory(); // Not always necessary, but can help
+            }
+        }
+        plugin.getLogger().info("Finished refreshing open menus.");
     }
 }
