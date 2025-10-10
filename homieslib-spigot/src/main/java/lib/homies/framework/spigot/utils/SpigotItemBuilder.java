@@ -4,7 +4,6 @@ import com.destroystokyo.paper.profile.PlayerProfile;
 import lib.homies.framework.utils.HomiesItemStack;
 import lib.homies.framework.utils.HomiesPlayerProfile;
 import lib.homies.framework.utils.ItemBuilder;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
@@ -22,6 +21,7 @@ import java.util.Arrays;
 public class SpigotItemBuilder implements ItemBuilder {
     private final ItemStack item;
     private final ItemMeta meta;
+    private final SpigotTextUtils textUtils = new SpigotTextUtils(); // Add an instance of SpigotTextUtils
 
     /**
      * Constructs a new SpigotItemBuilder with a specified material.
@@ -45,26 +45,26 @@ public class SpigotItemBuilder implements ItemBuilder {
 
     /**
      * Sets the display name of the item.
-     * Color codes are translated using {@link ChatColor#translateAlternateColorCodes(char, String)}.
+     * Color codes are translated using {@link SpigotTextUtils#colorize(String)}.
      * @param displayName The display name of the item.
      * @return The ItemBuilder instance for chaining.
      */
     @Override
     public ItemBuilder name(String displayName) {
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', displayName));
+        meta.setDisplayName(textUtils.colorize(displayName)); // Use SpigotTextUtils.colorize()
         return this;
     }
 
     /**
      * Sets the lore (description lines) of the item.
-     * Color codes are translated for each line.
+     * Color codes are translated for each line using {@link SpigotTextUtils#colorize(String)}.
      * @param lines An array of strings representing the lore lines.
      * @return The ItemBuilder instance for chaining.
      */
     @Override
     public ItemBuilder lore(String... lines) {
         meta.setLore(Arrays.stream(lines)
-                .map(l -> ChatColor.translateAlternateColorCodes('&', l))
+                .map(textUtils::colorize) // Use SpigotTextUtils.colorize()
                 .toList());
         return this;
     }
