@@ -2,7 +2,10 @@ package processor;
 
 import com.google.auto.service.AutoService;
 import com.squareup.javapoet.*;
-import lib.homies.framework.command.annotations.*;
+import lib.homies.framework.command.annotations.Async;
+import lib.homies.framework.command.annotations.Command;
+import lib.homies.framework.command.annotations.SubCommand;
+import lib.homies.framework.command.annotations.TabComplete;
 import lib.homies.framework.command.context.SubcommandInfo;
 import org.bukkit.Bukkit;
 
@@ -16,21 +19,35 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/**
- * Annotation processor for generating command dispatchers, metadata, and tab completers.
- * It processes classes annotated with {@link Command} to create boilerplate code
- * for Spigot command handling, prioritizing performance, simplicity, and organization.
- */
 @AutoService(Processor.class)
 @SupportedAnnotationTypes({"lib.homies.framework.command.annotations.Command"})
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
 public class CommandProcessor extends AbstractProcessor {
 
+    private Platform detectedPlatform = Platform.UNKNOWN;
+    private TypeName HOMIES_PLAYER_WRAPPER_TYPE;
+    private TypeName HOMIES_LIB_PLATFORM_CLASS;
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+        if (processingEnv.getElementUtils().getTypeElement("io.papermc.paper.threadedregions.RegionizedServer") != null) {
+            this.detectedPlatform = Platform.FOLIA;
+            this.HOMIES_PLAYER_WRAPPER_TYPE = ClassName.get("lib.homies.framework.folia.player", "FoliaPlayer");
+            this.HOMIES_LIB_PLATFORM_CLASS = ClassName.get("lib.homies.framework.folia", "HomiesLibFolia");
+        } else if (processingEnv.getElementUtils().getTypeElement("org.bukkit.Bukkit") != null) {
+            this.detectedPlatform = Platform.SPIGOT;
+            this.HOMIES_PLAYER_WRAPPER_TYPE = ClassName.get("lib.homies.framework.spigot.player", "SpigotPlayer");
+            this.HOMIES_LIB_PLATFORM_CLASS = ClassName.get("lib.homies.framework.spigot", "HomiesLibSpigot");
+        } else {
+            this.detectedPlatform = Platform.UNKNOWN;
+        }
+    }
+
     private final TypeName COMMAND_SENDER_TYPE = ClassName.get("org.bukkit.command", "CommandSender");
     private final TypeName PLAYER_TYPE = ClassName.get("org.bukkit.entity", "Player");
     private final TypeName CHAT_COLOR_TYPE = ClassName.get("org.bukkit", "ChatColor");
     private final TypeName HOMIES_PLAYER_TYPE = ClassName.get("lib.homies.framework.player", "HomiesPlayer");
-    private final TypeName SPIGOT_PLAYER_TYPE = ClassName.get("lib.homies.framework.spigot.player", "SpigotPlayer");
     private final TypeName SUBCOMMAND_INFO_TYPE = ClassName.get(SubcommandInfo.class);
     private final TypeName TAB_COMPLETER_TYPE = ClassName.get("org.bukkit.command", "TabCompleter");
     private final TypeName LIST_STRING_TYPE = ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(String.class));
@@ -40,14 +57,11 @@ public class CommandProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         for (Element element : roundEnv.getElementsAnnotatedWith(Command.class)) {
-            if (element.getKind() != ElementKind.CLASS) {
-                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "@Command annotation can only be applied to classes.", element);
-                continue;
-            }
+            if (element.getKind() != ElementKind.CLASS) continue;
 
             TypeElement typeElement = (TypeElement) element;
             if (typeElement.getAnnotation(Command.class).name().isEmpty()) {
-                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "@Command annotation on a class must have a non-empty name.", typeElement);
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "@Command must have a non-empty name.", typeElement);
                 continue;
             }
 
@@ -74,26 +88,18 @@ public class CommandProcessor extends AbstractProcessor {
     }
 
     private void generateCommandRegistry() throws IOException {
-        if (discoveredCommandClasses.isEmpty()) return;
+        if (discoveredCommandClasses.isEmpty() || detectedPlatform == Platform.UNKNOWN) return;
 
-        String packageName = "lib.homies.framework.spigot.command";
-        String generatedClassName = "HomiesCommandRegistry";
-
+        String packageName = detectedPlatform.getPackageName() + ".command";
         List<CodeBlock> classNames = discoveredCommandClasses.stream()
                 .map(te -> CodeBlock.of("$S", te.getQualifiedName().toString()))
                 .collect(Collectors.toList());
 
-        CodeBlock listInitializer = CodeBlock.builder()
-                .add("$T.of(\n    ", List.class)
-                .add(CodeBlock.join(classNames, ",\n    "))
-                .add("\n)")
-                .build();
-
         FieldSpec commandClassesField = FieldSpec.builder(LIST_STRING_TYPE, "COMMAND_CLASS_NAMES", Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                .initializer(listInitializer)
+                .initializer(CodeBlock.builder().add("$T.of(\n    ", List.class).add(CodeBlock.join(classNames, ",\n    ")).add("\n)").build())
                 .build();
 
-        TypeSpec registryClass = TypeSpec.classBuilder(generatedClassName)
+        TypeSpec registryClass = TypeSpec.classBuilder("HomiesCommandRegistry")
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .addField(commandClassesField)
                 .build();
@@ -115,12 +121,21 @@ public class CommandProcessor extends AbstractProcessor {
                 .addParameter(String.class, "label")
                 .addParameter(String[].class, "args");
 
-        ClassName homiesLibSpigotClass = ClassName.get("lib.homies.framework.spigot", "HomiesLibSpigot");
-        onCommandMethodBuilder.addStatement("$T plugin = $T.getPlugin($T.class)", ClassName.get("org.bukkit.plugin.java", "JavaPlugin"), ClassName.get("org.bukkit.plugin.java", "JavaPlugin"), homiesLibSpigotClass);
+        onCommandMethodBuilder.addStatement("$T plugin = $T.getPlugin($T.class)", ClassName.get("org.bukkit.plugin.java", "JavaPlugin"), ClassName.get("org.bukkit.plugin.java", "JavaPlugin"), HOMIES_LIB_PLATFORM_CLASS);
+
+        Command commandAnnotation = commandClass.getAnnotation(Command.class);
+        String basePermission = commandAnnotation.permission();
+        if (basePermission != null && !basePermission.isEmpty()) {
+            onCommandMethodBuilder.beginControlFlow("if (!sender.hasPermission($S))", basePermission)
+                    .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', $S))", CHAT_COLOR_TYPE, commandAnnotation.permissionMessage())
+                    .addStatement("return true")
+                    .endControlFlow();
+        }
 
         ExecutableElement defaultCommandMethod = commandClass.getEnclosedElements().stream()
-                .filter(e -> e.getKind() == ElementKind.METHOD && e.getAnnotation(Command.class) != null)
+                .filter(e -> e.getKind() == ElementKind.METHOD)
                 .map(e -> (ExecutableElement) e)
+                .filter(e -> (e.getAnnotation(SubCommand.class) != null && e.getAnnotation(SubCommand.class).value().isEmpty()) || (e.getAnnotation(Command.class) != null && e.getAnnotation(SubCommand.class) == null))
                 .findFirst()
                 .orElse(null);
 
@@ -130,41 +145,55 @@ public class CommandProcessor extends AbstractProcessor {
         } else {
             sendUsageMessage(onCommandMethodBuilder, commandClass.getAnnotation(Command.class).usage(), "&cThis command requires a subcommand. Use /<command> help for available commands.", null);
         }
-        onCommandMethodBuilder.addStatement("return true");
-        onCommandMethodBuilder.endControlFlow();
+        onCommandMethodBuilder.addStatement("return true").endControlFlow();
 
-        List<ExecutableElement> subCommandMethods = commandClass.getEnclosedElements().stream()
-                .filter(e -> e.getKind() == ElementKind.METHOD && e.getAnnotation(SubCommand.class) != null)
-                .map(e -> (ExecutableElement) e)
-                .collect(Collectors.toList());
-
-        Map<String, List<ExecutableElement>> commandsByPath = subCommandMethods.stream()
-                .collect(Collectors.groupingBy(e -> getBasePath(e.getAnnotation(SubCommand.class).value())));
-
-        List<String> sortedPaths = commandsByPath.keySet().stream()
-                .sorted(Comparator.comparingInt((String p) -> p.split(" ").length).reversed())
-                .collect(Collectors.toList());
-
-        boolean firstIf = true;
-        for (String path : sortedPaths) {
-            List<ExecutableElement> overloads = commandsByPath.get(path);
-            String[] pathWords = path.isEmpty() ? new String[0] : path.split(" ");
-
-            CodeBlock commandPathCondition = buildCommandPathCondition(pathWords, overloads.get(0).getAnnotation(SubCommand.class).aliases());
-
-            String controlFlow = firstIf ? "if" : "else if";
-            onCommandMethodBuilder.beginControlFlow("$L ($L)", controlFlow, commandPathCondition);
-            firstIf = false;
-
-            handleSubcommandOverloads(onCommandMethodBuilder, overloads, pathWords.length);
-
-            onCommandMethodBuilder.endControlFlow();
+        List<ExecutableElement> subCommandMethods = new ArrayList<>();
+        for (Element e : commandClass.getEnclosedElements()) {
+            if (e.getKind() == ElementKind.METHOD && e.getAnnotation(SubCommand.class) != null && !e.getAnnotation(SubCommand.class).value().isEmpty()) {
+                subCommandMethods.add((ExecutableElement) e);
+            }
         }
 
-        if (!sortedPaths.isEmpty()) {
-            onCommandMethodBuilder.beginControlFlow("else");
-            sendUsageMessage(onCommandMethodBuilder, commandClass.getAnnotation(Command.class).usage(), "&cUnknown subcommand. Use /<command> help for available commands.", null);
-            onCommandMethodBuilder.endControlFlow();
+        if (!subCommandMethods.isEmpty()) {
+            Map<Boolean, List<ExecutableElement>> partitionedCommands = subCommandMethods.stream()
+                    .collect(Collectors.partitioningBy(e -> getBasePath(e.getAnnotation(SubCommand.class).value()).isEmpty()));
+
+            List<ExecutableElement> placeholderOnlyMethods = partitionedCommands.get(true);
+            List<ExecutableElement> namedMethods = partitionedCommands.get(false);
+
+            boolean hasGeneratedNamedCommands = false;
+            if (!namedMethods.isEmpty()) {
+                Map<String, List<ExecutableElement>> commandsByPath = namedMethods.stream()
+                        .collect(Collectors.groupingBy(e -> getBasePath(e.getAnnotation(SubCommand.class).value())));
+
+                List<String> sortedPaths = commandsByPath.keySet().stream()
+                        .sorted(Comparator.comparingInt((String p) -> p.split(" ").length).reversed())
+                        .collect(Collectors.toList());
+
+                boolean firstIf = true;
+                for (String path : sortedPaths) {
+                    List<ExecutableElement> overloads = commandsByPath.get(path);
+                    String[] pathWords = path.split(" ");
+                    CodeBlock commandPathCondition = buildCommandPathCondition(pathWords, overloads.get(0).getAnnotation(SubCommand.class).aliases());
+                    if (commandPathCondition.isEmpty()) continue;
+
+                    onCommandMethodBuilder.beginControlFlow("$L ($L)", firstIf ? "if" : "else if", commandPathCondition);
+                    firstIf = false;
+                    handleSubcommandOverloads(onCommandMethodBuilder, overloads, pathWords.length);
+                    onCommandMethodBuilder.endControlFlow();
+                }
+                hasGeneratedNamedCommands = !firstIf;
+            }
+
+            if (!placeholderOnlyMethods.isEmpty()) {
+                if (hasGeneratedNamedCommands) onCommandMethodBuilder.beginControlFlow("else");
+                handleSubcommandOverloads(onCommandMethodBuilder, placeholderOnlyMethods, 0);
+                if (hasGeneratedNamedCommands) onCommandMethodBuilder.endControlFlow();
+            } else if (hasGeneratedNamedCommands) {
+                onCommandMethodBuilder.beginControlFlow("else");
+                sendUsageMessage(onCommandMethodBuilder, commandClass.getAnnotation(Command.class).usage(), "&cUnknown subcommand. Use /<command> help for available commands.", null);
+                onCommandMethodBuilder.endControlFlow();
+            }
         }
 
         onCommandMethodBuilder.addStatement("return true");
@@ -181,17 +210,22 @@ public class CommandProcessor extends AbstractProcessor {
     }
 
     private void generateTabCompleter(TypeElement commandClass) throws IOException {
-        String originalClassName = commandClass.getSimpleName().toString();
-        String packageName = processingEnv.getElementUtils().getPackageOf(commandClass).getQualifiedName().toString();
-        String generatedClassName = originalClassName + "_GeneratedTabCompleter";
+        List<ExecutableElement> allTabCompleters = new ArrayList<>();
+        for (Element e : commandClass.getEnclosedElements()) {
+            if (e.getKind() == ElementKind.METHOD && e.getAnnotation(TabComplete.class) != null) {
+                allTabCompleters.add((ExecutableElement) e);
+            }
+        }
 
-        List<ExecutableElement> tabCompleteMethods = commandClass.getEnclosedElements().stream()
-                .filter(e -> e.getKind() == ElementKind.METHOD && e.getAnnotation(TabComplete.class) != null)
-                .map(e -> (ExecutableElement) e)
-                .collect(Collectors.toList());
+        List<ExecutableElement> subCommandMethods = new ArrayList<>();
+        for (Element e : commandClass.getEnclosedElements()) {
+            if (e.getKind() == ElementKind.METHOD && e.getAnnotation(SubCommand.class) != null && !e.getAnnotation(SubCommand.class).value().isEmpty()) {
+                subCommandMethods.add((ExecutableElement) e);
+            }
+        }
 
-        if (tabCompleteMethods.isEmpty()) {
-            return;
+        if (allTabCompleters.isEmpty() && subCommandMethods.isEmpty()) {
+            return; // No tab completion to generate
         }
 
         MethodSpec.Builder onTabCompleteMethodBuilder = MethodSpec.methodBuilder("onTabComplete")
@@ -205,50 +239,55 @@ public class CommandProcessor extends AbstractProcessor {
 
         onTabCompleteMethodBuilder.addStatement("final String currentArg = args.length == 0 ? \"\" : args[args.length - 1].toLowerCase()");
 
-        tabCompleteMethods.sort(Comparator.comparingInt((ExecutableElement o) -> o.getAnnotation(TabComplete.class).value().split(" ").length).reversed());
+        // Automatic permission-based subcommand completion for the first argument
+        onTabCompleteMethodBuilder.beginControlFlow("if (args.length == 1)");
+        onTabCompleteMethodBuilder.addStatement("$T<String> suggestions = new $T<>()", List.class, ArrayList.class);
 
-        boolean firstIf = true;
-        for (ExecutableElement method : tabCompleteMethods) {
-            TabComplete tabCompleteAnnotation = method.getAnnotation(TabComplete.class);
-            String tabPath = tabCompleteAnnotation.value();
-            String[] tabPathWords = tabPath.isEmpty() ? new String[0] : tabPath.split(" ");
+        for (ExecutableElement subMethod : subCommandMethods) {
+            SubCommand subCmd = subMethod.getAnnotation(SubCommand.class);
+            String permission = subCmd.permission();
+            String subCommandName = getBasePath(subCmd.value()).split(" ")[0];
 
-            CodeBlock pathCondition = buildTabCompletePathCondition(tabPathWords, tabCompleteAnnotation.aliases());
-
-            String controlFlow = firstIf ? "if" : "else if";
-            onTabCompleteMethodBuilder.beginControlFlow("$L ($L)", controlFlow, pathCondition);
-            firstIf = false;
-
-            List<CodeBlock> parameterInvocations = new ArrayList<>();
-            for (VariableElement param : method.getParameters()) {
-                TypeName paramType = TypeName.get(param.asType());
-                if (paramType.equals(COMMAND_SENDER_TYPE)) {
-                    parameterInvocations.add(CodeBlock.of("sender"));
-                } else if (paramType.equals(HOMIES_PLAYER_TYPE)) {
-                    onTabCompleteMethodBuilder.beginControlFlow("if (!(sender instanceof $T))", PLAYER_TYPE)
-                            .addStatement("return $T.emptyList()", Collections.class)
-                            .endControlFlow();
-                    parameterInvocations.add(CodeBlock.of("new $T(($T) sender)", SPIGOT_PLAYER_TYPE, PLAYER_TYPE));
-                } else if (paramType.equals(ClassName.get(String[].class))) {
-                    parameterInvocations.add(CodeBlock.of("args"));
-                } else if (paramType.equals(ClassName.get(String.class))) {
-                    parameterInvocations.add(CodeBlock.of("currentArg"));
-                } else {
-                    processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "Unsupported parameter type for @TabComplete: " + paramType, param);
-                    onTabCompleteMethodBuilder.addStatement("return $T.emptyList()", Collections.class);
-                    break;
-                }
+            CodeBlock.Builder suggestionBlock = CodeBlock.builder();
+            if (permission != null && !permission.isEmpty()) {
+                suggestionBlock.beginControlFlow("if (sender.hasPermission($S))", permission);
             }
 
-            CodeBlock methodCall = CodeBlock.builder().add("commandInstance.$L($L)", method.getSimpleName(), CodeBlock.join(parameterInvocations, ", ")).build();
+            suggestionBlock.addStatement("suggestions.add($S)", subCommandName);
+            for (String subAlias : subCmd.aliases()) {
+                suggestionBlock.addStatement("suggestions.add($S)", subAlias);
+            }
 
-            onTabCompleteMethodBuilder.addStatement("List<String> suggestions = $L", methodCall);
-            onTabCompleteMethodBuilder.addStatement("return suggestions.stream().filter(s -> s.toLowerCase().startsWith(currentArg)).collect($T.toList())", Collectors.class);
+            if (permission != null && !permission.isEmpty()) {
+                suggestionBlock.endControlFlow();
+            }
+            onTabCompleteMethodBuilder.addCode(suggestionBlock.build());
+        }
 
+        onTabCompleteMethodBuilder.addStatement("return suggestions.stream().filter(s -> s.toLowerCase().startsWith(currentArg)).collect($T.toList())", Collectors.class);
+        onTabCompleteMethodBuilder.endControlFlow();
+
+        // Handle user-defined tab completers for deeper arguments
+        List<ExecutableElement> otherTabCompleters = allTabCompleters.stream()
+                .filter(m -> !m.getAnnotation(TabComplete.class).value().isEmpty())
+                .sorted(Comparator.comparingInt((ExecutableElement o) -> o.getAnnotation(TabComplete.class).value().split(" ").length).reversed())
+                .collect(Collectors.toList());
+
+        for (ExecutableElement method : otherTabCompleters) {
+            TabComplete tabCompleteAnnotation = method.getAnnotation(TabComplete.class);
+            String[] tabPathWords = tabCompleteAnnotation.value().split(" ");
+            CodeBlock pathCondition = buildTabCompletePathCondition(tabPathWords, tabCompleteAnnotation.aliases());
+
+            onTabCompleteMethodBuilder.beginControlFlow("if ($L)", pathCondition);
+            executeTabCompleteMethod(onTabCompleteMethodBuilder, method);
             onTabCompleteMethodBuilder.endControlFlow();
         }
 
         onTabCompleteMethodBuilder.addStatement("return $T.emptyList()", Collections.class);
+
+        String originalClassName = commandClass.getSimpleName().toString();
+        String packageName = processingEnv.getElementUtils().getPackageOf(commandClass).getQualifiedName().toString();
+        String generatedClassName = originalClassName + "_GeneratedTabCompleter";
 
         TypeSpec generatedClass = TypeSpec.classBuilder(generatedClassName)
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
@@ -261,6 +300,27 @@ public class CommandProcessor extends AbstractProcessor {
         JavaFile.builder(packageName, generatedClass).build().writeTo(processingEnv.getFiler());
     }
 
+    private void executeTabCompleteMethod(MethodSpec.Builder builder, ExecutableElement method) {
+        List<CodeBlock> parameterInvocations = new ArrayList<>();
+        for (VariableElement param : method.getParameters()) {
+            TypeName paramType = TypeName.get(param.asType());
+            if (paramType.equals(COMMAND_SENDER_TYPE)) {
+                parameterInvocations.add(CodeBlock.of("sender"));
+            } else if (paramType.equals(HOMIES_PLAYER_TYPE)) {
+                builder.beginControlFlow("if (!(sender instanceof $T))", PLAYER_TYPE).addStatement("return $T.emptyList()", Collections.class).endControlFlow();
+                parameterInvocations.add(CodeBlock.of("new $T(($T) sender)", HOMIES_PLAYER_WRAPPER_TYPE, PLAYER_TYPE));
+            } else if (paramType.equals(TypeName.get(String[].class))) {
+                parameterInvocations.add(CodeBlock.of("args"));
+            } else if (paramType.equals(ClassName.get(String.class))) {
+                parameterInvocations.add(CodeBlock.of("currentArg"));
+            } else {
+                return; // Skip on unsupported param
+            }
+        }
+        builder.addStatement("List<String> suggestions = commandInstance.$L($L)", method.getSimpleName(), CodeBlock.join(parameterInvocations, ", "));
+        builder.addStatement("return suggestions.stream().filter(s -> s.toLowerCase().startsWith(currentArg)).collect($T.toList())", Collectors.class);
+    }
+
     private CodeBlock buildCommandPathCondition(String[] pathWords, String[] aliases) {
         List<String> allPaths = new ArrayList<>(Arrays.asList(aliases));
         allPaths.add(String.join(" ", pathWords));
@@ -269,15 +329,13 @@ public class CommandProcessor extends AbstractProcessor {
                 .filter(p -> p != null && !p.isEmpty())
                 .map(path -> {
                     String[] words = path.split(" ");
-                    CodeBlock.Builder pathCondition = CodeBlock.builder();
-                    pathCondition.add("(args.length >= $L", words.length);
+                    CodeBlock.Builder pathCondition = CodeBlock.builder().add("(args.length >= $L", words.length);
                     for (int i = 0; i < words.length; i++) {
                         if (!words[i].startsWith("<")) {
                             pathCondition.add(" && args[$L].equalsIgnoreCase($S)", i, words[i]);
                         }
                     }
-                    pathCondition.add(")");
-                    return pathCondition.build();
+                    return pathCondition.add(")").build();
                 })
                 .collect(CodeBlock.joining(" || "));
     }
@@ -290,24 +348,36 @@ public class CommandProcessor extends AbstractProcessor {
                 .filter(Objects::nonNull)
                 .map(path -> {
                     String[] words = path.isEmpty() ? new String[0] : path.split(" ");
-                    CodeBlock.Builder pathCondition = CodeBlock.builder();
-                    pathCondition.add("(args.length == $L", words.length + 1);
+                    CodeBlock.Builder pathCondition = CodeBlock.builder().add("(args.length == $L", words.length + 1);
                     for (int i = 0; i < words.length; i++) {
                         if (!words[i].startsWith("<")) {
                             pathCondition.add(" && args[$L].equalsIgnoreCase($S)", i, words[i]);
                         }
                     }
-                    pathCondition.add(")");
-                    return pathCondition.build();
+                    return pathCondition.add(")").build();
                 })
                 .collect(CodeBlock.joining(" || "));
     }
 
     private void handleDefaultCommand(MethodSpec.Builder builder, ExecutableElement defaultCommandMethod) {
-        Command defaultCmdAnnotation = defaultCommandMethod.getAnnotation(Command.class);
-        if (defaultCmdAnnotation.playerOnly()) {
+        String playerOnlyMessage = "";
+        boolean isPlayerOnly = false;
+
+        SubCommand subCmdAnnotation = defaultCommandMethod.getAnnotation(SubCommand.class);
+        if (subCmdAnnotation != null) {
+            isPlayerOnly = subCmdAnnotation.playerOnly();
+            playerOnlyMessage = subCmdAnnotation.playerOnlyMessage();
+        } else {
+            Command cmdAnnotation = defaultCommandMethod.getAnnotation(Command.class);
+            if (cmdAnnotation != null) {
+                isPlayerOnly = cmdAnnotation.playerOnly();
+                playerOnlyMessage = cmdAnnotation.playerOnlyMessage();
+            }
+        }
+
+        if (isPlayerOnly) {
             builder.beginControlFlow("if (!(sender instanceof $T))", PLAYER_TYPE)
-                    .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', $S))", CHAT_COLOR_TYPE, defaultCmdAnnotation.playerOnlyMessage())
+                    .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', $S))", CHAT_COLOR_TYPE, playerOnlyMessage)
                     .addStatement("return true")
                     .endControlFlow();
         }
@@ -322,8 +392,7 @@ public class CommandProcessor extends AbstractProcessor {
             SubCommand subCmdAnnotation = method.getAnnotation(SubCommand.class);
             int requiredArgs = countPlaceholders(subCmdAnnotation.value());
 
-            String controlFlow = firstInnerIf ? "if" : "else if";
-            builder.beginControlFlow("$L (args.length - $L == $L)", controlFlow, pathWordCount, requiredArgs);
+            builder.beginControlFlow("$L (args.length - $L == $L)", firstInnerIf ? "if" : "else if", pathWordCount, requiredArgs);
             firstInnerIf = false;
 
             if (subCmdAnnotation.playerOnly()) {
@@ -334,9 +403,7 @@ public class CommandProcessor extends AbstractProcessor {
             }
 
             executeCommandMethod(builder, method, "commandInstance", pathWordCount);
-
-            builder.addStatement("return true");
-            builder.endControlFlow();
+            builder.addStatement("return true").endControlFlow();
         }
 
         builder.beginControlFlow("else");
@@ -347,10 +414,23 @@ public class CommandProcessor extends AbstractProcessor {
     private void executeCommandMethod(MethodSpec.Builder builder, ExecutableElement method, String instanceName, int argStartIndex) {
         builder.beginControlFlow("try");
 
-        Permission perm = method.getAnnotation(Permission.class);
-        if (perm != null) {
-            builder.beginControlFlow("if (!sender.hasPermission($S))", perm.value())
-                    .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', $S))", CHAT_COLOR_TYPE, perm.message())
+        String permission = "";
+        String permissionMessage = "";
+        SubCommand subCmd = method.getAnnotation(SubCommand.class);
+        if (subCmd != null) {
+            permission = subCmd.permission();
+            permissionMessage = subCmd.permissionMessage();
+        } else {
+            Command cmd = method.getAnnotation(Command.class);
+            if (cmd != null) {
+                permission = cmd.permission();
+                permissionMessage = cmd.permissionMessage();
+            }
+        }
+
+        if (permission != null && !permission.isEmpty()) {
+            builder.beginControlFlow("if (!sender.hasPermission($S))", permission)
+                    .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', $S))", CHAT_COLOR_TYPE, permissionMessage)
                     .addStatement("return true")
                     .endControlFlow();
         }
@@ -367,7 +447,7 @@ public class CommandProcessor extends AbstractProcessor {
                         .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', $S))", CHAT_COLOR_TYPE, "This command can only be run by a player.")
                         .addStatement("return true")
                         .endControlFlow();
-                parameterInvocations.add(CodeBlock.of("new $T(($T) sender)", SPIGOT_PLAYER_TYPE, PLAYER_TYPE));
+                parameterInvocations.add(CodeBlock.of("new $T(($T) sender)", HOMIES_PLAYER_WRAPPER_TYPE, PLAYER_TYPE));
                 senderInjected = true;
             } else if (paramType.equals(COMMAND_SENDER_TYPE) && !senderInjected) {
                 parameterInvocations.add(CodeBlock.of("sender"));
@@ -380,7 +460,7 @@ public class CommandProcessor extends AbstractProcessor {
                             .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', \"&cPlayer not found: \" + args[$L]))", CHAT_COLOR_TYPE, currentArgIndex)
                             .addStatement("return true")
                             .endControlFlow();
-                    parameterInvocations.add(CodeBlock.of("new $T($L)", SPIGOT_PLAYER_TYPE, paramName));
+                    parameterInvocations.add(CodeBlock.of("new $T($L)", HOMIES_PLAYER_WRAPPER_TYPE, paramName));
                     currentArgIndex++;
                 } else if (paramType.equals(ClassName.get(String.class))) {
                     parameterInvocations.add(CodeBlock.of("args[$L]", currentArgIndex));
@@ -406,7 +486,11 @@ public class CommandProcessor extends AbstractProcessor {
         CodeBlock methodCall = CodeBlock.builder().add("$L.$L($L)", instanceName, method.getSimpleName(), CodeBlock.join(parameterInvocations, ", ")).build();
 
         if (method.getAnnotation(Async.class) != null) {
-            builder.addStatement("$T.getScheduler().runTaskAsynchronously(plugin, () -> $L)", Bukkit.class, methodCall);
+            if (detectedPlatform == Platform.FOLIA) {
+                builder.addStatement("$T.getGlobalRegionScheduler().run(plugin, () -> $L)", Bukkit.class, methodCall);
+            } else {
+                builder.addStatement("$T.getScheduler().runTaskAsynchronously(plugin, () -> $L)", Bukkit.class, methodCall);
+            }
         } else {
             builder.addStatement(methodCall);
         }
@@ -415,6 +499,13 @@ public class CommandProcessor extends AbstractProcessor {
                 .addStatement("sender.sendMessage($T.translateAlternateColorCodes('&', $S))", CHAT_COLOR_TYPE, "&cAn unexpected internal error occurred.")
                 .addStatement("e.printStackTrace()");
         builder.endControlFlow();
+    }
+
+    private int countPlaceholders(String value) {
+        Matcher matcher = Pattern.compile("<[^>]+>").matcher(value);
+        int count = 0;
+        while (matcher.find()) count++;
+        return count;
     }
 
     private void sendUsageMessage(MethodSpec.Builder builder, String usage, String defaultMessage, String subCommand) {
@@ -432,29 +523,20 @@ public class CommandProcessor extends AbstractProcessor {
         return value.replaceAll("<[^>]+>", "").trim().replaceAll("\\s+", " ");
     }
 
-    private int countPlaceholders(String value) {
-        Pattern pattern = Pattern.compile("<[^>]+>");
-        Matcher matcher = pattern.matcher(value);
-        int count = 0;
-        while (matcher.find()) {
-            count++;
-        }
-        return count;
-    }
-
     private void generateMetadataClass(TypeElement commandClass) throws IOException {
         String originalClassName = commandClass.getSimpleName().toString();
         String packageName = processingEnv.getElementUtils().getPackageOf(commandClass).getQualifiedName().toString();
         String generatedClassName = originalClassName + "_Metadata";
 
         ParameterizedTypeName listOfSubcommands = ParameterizedTypeName.get(ClassName.get(List.class), SUBCOMMAND_INFO_TYPE);
-
         FieldSpec.Builder fieldBuilder = FieldSpec.builder(listOfSubcommands, "SUBCOMMANDS", Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL);
 
-        List<ExecutableElement> subCommandMethods = commandClass.getEnclosedElements().stream()
-                .filter(e -> e.getKind() == ElementKind.METHOD && e.getAnnotation(SubCommand.class) != null)
-                .map(e -> (ExecutableElement) e)
-                .toList();
+        List<ExecutableElement> subCommandMethods = new ArrayList<>();
+        for (Element e : commandClass.getEnclosedElements()) {
+            if (e.getKind() == ElementKind.METHOD && e.getAnnotation(SubCommand.class) != null) {
+                subCommandMethods.add((ExecutableElement) e);
+            }
+        }
 
         CodeBlock.Builder listInitializer = CodeBlock.builder();
         if (subCommandMethods.isEmpty()) {
@@ -464,12 +546,9 @@ public class CommandProcessor extends AbstractProcessor {
             for (int i = 0; i < subCommandMethods.size(); i++) {
                 ExecutableElement methodElement = subCommandMethods.get(i);
                 SubCommand subCommandAnnotation = methodElement.getAnnotation(SubCommand.class);
-                Permission permissionAnnotation = methodElement.getAnnotation(Permission.class);
+                String permission = subCommandAnnotation.permission();
 
-                List<String> paramTypes = methodElement.getParameters().stream()
-                        .map(param -> param.asType().toString())
-                        .toList();
-
+                List<String> paramTypes = methodElement.getParameters().stream().map(param -> param.asType().toString()).toList();
                 CodeBlock paramList = paramTypes.isEmpty()
                         ? CodeBlock.of("$T.of()", List.class)
                         : CodeBlock.of("$T.of($L)", List.class, paramTypes.stream().map(p -> CodeBlock.of("$S", p)).collect(CodeBlock.joining(", ")));
@@ -481,11 +560,9 @@ public class CommandProcessor extends AbstractProcessor {
                         subCommandAnnotation.usage(),
                         methodElement.getParameters().size(),
                         paramList,
-                        permissionAnnotation != null ? permissionAnnotation.value() : "");
+                        permission != null ? permission : "");
 
-                if (i < subCommandMethods.size() - 1) {
-                    listInitializer.add(",\n");
-                }
+                if (i < subCommandMethods.size() - 1) listInitializer.add(",\n");
             }
             listInitializer.add("\n)");
         }
@@ -498,5 +575,13 @@ public class CommandProcessor extends AbstractProcessor {
                 .build();
 
         JavaFile.builder(packageName, metadataClass).build().writeTo(processingEnv.getFiler());
+    }
+
+    private enum Platform {
+        SPIGOT, FOLIA, UNKNOWN;
+
+        public String getPackageName() {
+            return this == SPIGOT ? "lib.homies.framework.spigot" : "lib.homies.framework.folia";
+        }
     }
 }
