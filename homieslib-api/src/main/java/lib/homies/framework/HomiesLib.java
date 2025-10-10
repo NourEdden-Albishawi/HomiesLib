@@ -4,6 +4,7 @@ import lib.homies.framework.config.ConfigManager;
 import lib.homies.framework.cooldown.CooldownService;
 import lib.homies.framework.database.DatabaseService;
 import lib.homies.framework.events.EventBus;
+import lib.homies.framework.events.Listener;
 import lib.homies.framework.menu.MenuManager;
 import lib.homies.framework.minigame.MiniGameManager;
 import lib.homies.framework.party.PartyService;
@@ -40,6 +41,17 @@ public final class HomiesLib {
      * All access to services is via static getters.
      */
     private HomiesLib() {}
+
+    /**
+     * Registers the given listeners.
+     *
+     * @param listeners The listeners to register.
+     */
+    public static void registerListeners(Listener... listeners) {
+        for (Listener listener : listeners) {
+            listener.register();
+        }
+    }
 
     /**
      * Retrieves the MenuManager service.
