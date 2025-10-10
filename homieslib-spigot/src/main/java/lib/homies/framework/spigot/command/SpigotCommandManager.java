@@ -1,7 +1,6 @@
 package lib.homies.framework.spigot.command;
 
 import lib.homies.framework.command.annotations.Command;
-import lib.homies.framework.command.annotations.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandExecutor;
@@ -121,10 +120,10 @@ public class SpigotCommandManager {
             command.setUsage(ChatColor.translateAlternateColorCodes('&', commandAnnotation.usage().replace("<command>", commandName)));
 
             // Set permission and permission message if present on the class
-            Permission permission = commandClass.getAnnotation(Permission.class);
-            if (permission != null) {
-                command.setPermission(permission.value());
-                command.setPermissionMessage(ChatColor.translateAlternateColorCodes('&', permission.message()));
+            String permission = commandAnnotation.permission();
+            if (permission != null && !permission.isEmpty()) {
+                command.setPermission(permission);
+                command.setPermissionMessage(ChatColor.translateAlternateColorCodes('&', commandAnnotation.permissionMessage()));
             }
 
             // Load and set the generated tab completer, if it exists
