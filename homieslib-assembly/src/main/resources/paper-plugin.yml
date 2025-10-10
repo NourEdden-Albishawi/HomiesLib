@@ -1,0 +1,5 @@
+name: HomiesLibSpigot
+version: ${project.version}
+main: lib.homies.framework.spigot.HomiesLibSpigot
+api-version: '1.21'
+author: Homies
