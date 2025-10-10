@@ -1,9 +1,6 @@
 package lib.homies.framework.command.annotations;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  * Marks a method as a tab completer for a specific command or subcommand path.
@@ -16,6 +13,7 @@ import java.lang.annotation.Target;
  * </ul>
  * and optionally {@code String} for the current partial argument.
  */
+@Repeatable(TabCompletes.class)
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.METHOD)
 public @interface TabComplete {
