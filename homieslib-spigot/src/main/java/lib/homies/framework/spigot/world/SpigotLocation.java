@@ -83,4 +83,12 @@ public class SpigotLocation implements HomiesLocation {
     public float getPitch() {
         return location.getPitch();
     }
+
+    @Override
+    public <T> T getAs(Class<T> platformClass) {
+        if (platformClass.isInstance(location)) {
+            return platformClass.cast(location);
+        }
+        return null;
+    }
 }
