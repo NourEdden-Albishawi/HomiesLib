@@ -1,6 +1,13 @@
 # ✨ HomiesLib: The Ultimate Minecraft Plugin Framework ✨
 
-Welcome to **HomiesLib** – your go-to, multi-platform framework for crafting high-performance, feature-rich Minecraft plugins with unparalleled simplicity! 🚀 Designed for third-party developers, HomiesLib takes the pain out of plugin development, letting you focus on innovation, not boilerplate.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-username/HomiesLib/actions)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/your-username/HomiesLib/releases)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](https://github.com/your-username/HomiesLib/blob/main/LICENSE)
+
+**HomiesLib** is a powerful, multi-platform framework designed for Minecraft plugin developers who want to build
+high-performance, feature-rich plugins with unparalleled simplicity. By providing a clean, API-driven architecture,
+HomiesLib takes the pain out of boilerplate code, letting you focus on innovation. Whether you're a solo developer or
+part of a team, this framework is built to make your development experience a joy.
 
 ---
 
@@ -22,17 +29,24 @@ Say goodbye to tangled code and hello to a framework that makes development a jo
 
 HomiesLib provides robust, abstracted systems for:
 
-* **💬 Commands:** A fully automatic, annotation-driven command system with dispatcher and tab-completer generation.
-*   **⚙️ Configuration:** Easy, annotation-based YAML configuration management.
-*   **📢 Events:** A powerful event bus for both custom and native platform events.
-*   **🖼️ Menus:** Dynamic, paginated, and animated inventory GUIs.
-*   **⏱️ Scheduling:** Flexible task scheduling for sync and async operations.
-*   **💾 Database:** Redis-based ORM with annotation-driven entity mapping.
-*   **🎮 Minigames:** Abstracted core for building complex minigame logic.
+* **💬 Annotation-Driven Commands:** A fully automatic command system. Define commands, subcommands, permissions, and
+  tab-completion with simple annotations.
+* **⚙️ Effortless Configuration:** Easily manage YAML configurations using annotation-based POJOs (Plain Old Java
+  Objects).
+* **📢 Powerful Event Bus:** A robust event system for both custom `LibEvent`s and native platform events (e.g., Bukkit
+  events).
+* **🖼️ Dynamic GUI Menus:** Create complex, paginated, and animated inventory GUIs.
+* **⏱️ Flexible Task Scheduling:** A clean and fluent API for scheduling synchronous and asynchronous tasks, with
+  support for delays and repeating intervals.
+* **💾 Multi-Backend Database Service:** A powerful ORM with out-of-the-box support for **Redis**, **MySQL**, and *
+  *SQLite**. Features an intelligent caching layer to minimize database load.
+* **🎮 Abstracted Minigame Core:** A foundational structure to build and manage complex minigame logic, states, and
+  player sessions.
 *   **👤 Player Data:** Platform-independent service for managing player-specific data.
 *   **⏳ Cooldowns:** Efficiently manage time-based restrictions for player actions.
 *   **🥳 Parties:** Robust system for creating and managing player groups.
-*   **✨ Utilities:** Platform-agnostic helpers for items, text, locations, and more!
+* **✨ Platform-Agnostic Utilities:** A rich set of helpers for creating items (`ItemBuilder`), colorizing text (
+  `TextUtils`), managing player heads, and more, all designed to be independent of the server platform.
 
 ---
 
@@ -144,19 +158,128 @@ To use HomiesLib in your plugin:
 
 ## 📚 Usage Examples
 
-Here are examples demonstrating how to use various systems provided by HomiesLib.
+This section provides a detailed look at how to use the core systems of HomiesLib.
+
+### ⚙️ Configuration Management
+
+Define your `config.yml` structure in a simple Java class.
+
+```java
+// 1. Define the configuration class
+package com.yourcompany.config;
+
+import lib.homies.framework.config.annotations.ConfigFile;
+import lib.homies.framework.config.annotations.ConfigKey;
+
+@ConfigFile(fileName = "settings.yml")
+public class PluginSettings {
+    @ConfigKey(path = "welcome.message", comment = "Message sent to players on join.")
+    public String welcomeMessage = "&aWelcome, %player_name%!";
+
+    @ConfigKey(path = "features.pvp-enabled")
+    public boolean pvpEnabled = true;
+}
+
+// 2. Load it in your plugin's onEnable
+import lib.homies.framework.HomiesLib;
+import lib.homies.framework.PluginContext;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class MyPlugin extends JavaPlugin {
+    private PluginSettings settings;
+
+    @Override
+    public void onEnable() {
+        // For Spigot/Paper:
+        PluginContext pluginContext = new lib.homies.framework.spigot.SpigotPluginContext(this);
+
+        // Load the configuration
+        settings = HomiesLib.getConfigManager().loadConfig(pluginContext, PluginSettings.class);
+
+        // Now you can use it
+        getLogger().info("PvP Enabled: " + settings.pvpEnabled);
+    }
+}
+```
+
+### 📢 Event Bus
+
+Subscribe to custom framework events or native platform events.
+
+```java
+// 1. Define a custom event
+package com.yourcompany.events;
+
+import lib.homies.framework.events.LibEvent;
+import lib.homies.framework.player.HomiesPlayer;
+import lombok.Getter;
+
+@Getter
+public class PlayerRankUpEvent extends LibEvent {
+    private final HomiesPlayer player;
+    private final String oldRank;
+    private final String newRank;
+
+    public PlayerRankUpEvent(HomiesPlayer player, String oldRank, String newRank) {
+        this.player = player;
+        this.oldRank = oldRank;
+        this.newRank = newRank;
+    }
+}
+
+// 2. Subscribe to events in your onEnable
+import lib.homies.framework.HomiesLib;
+import lib.homies.framework.player.HomiesPlayer;
+import com.yourcompany.events.PlayerRankUpEvent;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class MyPluginEventExample extends JavaPlugin implements Listener {
+
+    private HomiesPlayer getHomiesPlayer(Player bukkitPlayer) {
+        return new lib.homies.framework.spigot.player.SpigotPlayer(bukkitPlayer);
+    }
+
+    @Override
+    public void onEnable() {
+        // Subscribe to a custom event
+        HomiesLib.getEventBus().subscribe(PlayerRankUpEvent.class, event -> {
+            HomiesLib.getMessageUtils().broadcast(
+                    "&e" + event.getPlayer().getName() + " has ranked up from &7" + event.getOldRank() + " &eto &a" + event.getNewRank() + "&e!"
+            );
+            getLogger().info(event.getPlayer().getName() + " ranked up!");
+        });
+
+        // Subscribe to a native Bukkit event
+        HomiesLib.getEventBus().subscribePlatform(PlayerJoinEvent.class, event -> {
+            HomiesLib.getMessageUtils().broadcast("&b" + event.getPlayer().getName() + " has joined the server!");
+        });
+    }
+
+    // Example of calling a custom event
+    public void giveRank(Player bukkitPlayer, String newRank) {
+        HomiesPlayer player = getHomiesPlayer(bukkitPlayer);
+        String currentRank = "Member"; // Get actual rank from player data
+        if (!currentRank.equals(newRank)) {
+            HomiesLib.getEventBus().call(new PlayerRankUpEvent(player, currentRank, newRank));
+        }
+    }
+}
+```
 
 ### 💬 Command System
 
-Define each command in its own class. The framework handles registration, sub-command dispatching, and tab completion
-automatically.
+Define a full command with subcommands, arguments, permissions, and tab-completion in a single class.
 
 ```java
-// In your plugin's source code (e.g., com.yourcompany.commands.GamemodeCommand.java)
 package com.yourcompany.commands;
 
 import lib.homies.framework.HomiesLib;
-import lib.homies.framework.command.annotations.*;
+import lib.homies.framework.command.annotations.Command;
+import lib.homies.framework.command.annotations.SubCommand;
+import lib.homies.framework.command.annotations.TabComplete;
 import lib.homies.framework.player.HomiesPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -167,89 +290,47 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * A comprehensive /gamemode command demonstrating all features of the command framework.
- */
-@Command(name = "gamemode", description = "Set a player's gamemode.", aliases = {"gm"}, usage = "&cUsage: /<command> <mode> [player]")
+@Command(name = "gamemode", description = "Set a player's gamemode.", aliases = {"gm"}, permission = "myplugin.gamemode")
 public class GamemodeCommand {
 
-    // 1. Default Executor: Called for `/gamemode`
+    // Default executor for /gamemode
     @Command(playerOnly = true)
     public void execute(HomiesPlayer sender) {
-        // This method is required and serves as the entry point.
-        // It runs when no subcommands match.
         HomiesLib.getMessageUtils().send(sender, "&cUsage: /gamemode <creative|survival> [player]");
     }
 
-    // 2. Subcommand without arguments: `/gamemode creative`
-    @SubCommand(value = "creative", aliases = {"1", "c"}, description = "Set your gamemode to Creative.")
-    @Permission(value = "myplugin.gamemode.creative", message = "&cYou don't have permission.")
+    // Subcommand: /gamemode creative
+    @SubCommand(value = "creative", aliases = {"1", "c"}, permission = "myplugin.gamemode.creative")
     public void onCreative(HomiesPlayer sender) {
-        Player bukkitPlayer = sender.getAs(Player.class); // Safely get the underlying Bukkit Player
+        Player bukkitPlayer = sender.getAs(Player.class);
         if (bukkitPlayer != null) {
             bukkitPlayer.setGameMode(GameMode.CREATIVE);
-            HomiesLib.getMessageUtils().send(sender, "&aYour gamemode has been set to &eCreative&a.");
-        } else {
-            HomiesLib.getMessageUtils().send(sender, "&cThis command can only be run by a player.");
+            HomiesLib.getMessageUtils().send(sender, "&aYour gamemode is now &eCreative&a.");
         }
     }
 
-    // 3. Subcommand with a player argument: `/gamemode creative <player>`
-    @SubCommand(value = "creative <player>", description = "Set another player's gamemode to Creative.")
-    @Permission("myplugin.gamemode.creative.other")
+    // Subcommand with argument: /gamemode creative <player>
+    @SubCommand(value = "creative <player>", permission = "myplugin.gamemode.creative.other")
     public void onCreativeOther(HomiesPlayer sender, HomiesPlayer target) {
         Player targetPlayer = target.getAs(Player.class);
         if (targetPlayer != null) {
             targetPlayer.setGameMode(GameMode.CREATIVE);
             HomiesLib.getMessageUtils().send(sender, "&aSet &b" + target.getName() + "'s &agamemode to &eCreative&a.");
-            HomiesLib.getMessageUtils().send(target, "&aYour gamemode was set to &eCreative &aby &b" + sender.getName() + "&a.");
-        } else {
-            HomiesLib.getMessageUtils().send(sender, "&cTarget player not found or not online.");
+            HomiesLib.getMessageUtils().send(target, "&aYour gamemode was set by &b" + sender.getName() + "&a.");
         }
     }
 
-    // 4. Another subcommand: `/gamemode survival`
-    @SubCommand(value = "survival", aliases = {"0", "_s"}, description = "Set your gamemode to Survival.")
-    @Permission("myplugin.gamemode.survival")
-    public void onSurvival(HomiesPlayer sender) {
-        Player bukkitPlayer = sender.getAs(Player.class);
-        if (bukkitPlayer != null) {
-            bukkitPlayer.setGameMode(GameMode.SURVIVAL);
-            HomiesLib.getMessageUtils().send(sender, "&aYour gamemode has been set to &eSurvival&a.");
-        } else {
-            HomiesLib.getMessageUtils().send(sender, "&cThis command can only be run by a player.");
-        }
+    // Tab completion for the first argument
+    @TabComplete("")
+    public List<String> completeBase(CommandSender sender) {
+        return Arrays.asList("creative", "survival", "spectator", "adventure");
     }
 
-    // --- TAB COMPLETION --- //
-
-    /**
-     * Provides suggestions for the first argument (e.g., /gamemode <TAB>).
-     * The empty value `""` targets the first argument.
-     */
-    @TabComplete(value = "")
-    public List<String> completeGamemode(CommandSender sender) {
-        return Arrays.asList("creative", "survival");
-    }
-
-    /**
-     * Provides player name suggestions for the argument AFTER "creative".
-     * (e.g., /gamemode creative <TAB>)
-     */
-    @TabComplete(value = "creative")
-    public List<String> completePlayerNames(CommandSender sender) {
-        return Bukkit.getOnlinePlayers().stream()
-                .map(Player::getName)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * You can reuse the same method for multiple paths.
-     * This also provides player names for `/gamemode survival <TAB>`.
-     */
-    @TabComplete(value = "survival")
-    public List<String> completePlayerNamesForSurvival(CommandSender sender) {
-        return completePlayerNames(sender); // Reuse the same logic
+    // Tab completion for the player argument
+    @TabComplete("creative")
+    @TabComplete("survival")
+    public List<String> completePlayer(CommandSender sender) {
+        return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
     }
 }
 ```
@@ -260,16 +341,16 @@ Schedule tasks to run synchronously or asynchronously, with delays or repeating 
 
 ```java
 // In your plugin's main class or a service
-
 import lib.homies.framework.HomiesLib;
 import lib.homies.framework.scheduler.HomiesTask;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 
-public class MyPluginSchedulerExample {
+public class MyPluginSchedulerExample extends JavaPlugin {
 
     private HomiesTask repeatingTask;
 
+    @Override
     public void onEnable() {
         // Run a task once after 100 ticks (5 seconds) on the main thread
         HomiesLib.getSchedulerService().task()
@@ -303,6 +384,7 @@ public class MyPluginSchedulerExample {
                 .start();
     }
 
+    @Override
     public void onDisable() {
         // Cancel a specific repeating task
         if (repeatingTask != null) {
@@ -316,381 +398,90 @@ public class MyPluginSchedulerExample {
 }
 ```
 
-### ⚙️ Configuration Management
+### 💾 Database Service (Cross-Server Data)
 
-Define your configuration as a simple POJO and let HomiesLib handle loading and saving.
-
-```java
-// 1. Define your configuration class (e.g., com.yourcompany.config.MyPluginConfig.java)
-package com.yourcompany.config;
-
-import lib.homies.framework.config.annotations.ConfigFile;
-import lib.homies.framework.config.annotations.ConfigKey;
-
-@ConfigFile(fileName = "config.yml", path = "settings") // Creates plugins/YourPlugin/settings/config.yml
-public class MyPluginConfig {
-
-    @ConfigKey(path = "welcome-message", comment = "The message sent to new players.")
-    public String welcomeMessage = "&aWelcome, %player_name%!";
-
-    @ConfigKey(path = "spawn-location.world")
-    public String spawnWorld = "world";
-
-    @ConfigKey(path = "spawn-location.x")
-    public double spawnX = 0.5;
-
-    @ConfigKey(path = "spawn-location.y")
-    public double spawnY = 64.0;
-
-    @ConfigKey(path = "spawn-location.z")
-    public double spawnZ = 0.5;
-
-    @ConfigKey(path = "features.economy-enabled")
-    public boolean economyEnabled = true;
-
-    @ConfigKey(path = "features.max-players-per-party")
-    public int maxPartySize = 8;
-}
-
-// 2. Load and use in your plugin's main class
-import lib.homies.framework.HomiesLib;
-import lib.homies.framework.PluginContext;
-import org.bukkit.plugin.java.JavaPlugin;
-import com.yourcompany.config.MyPluginConfig;
-
-public class MyPlugin extends JavaPlugin {
-
-    private MyPluginConfig config;
-
-    @Override
-    public void onEnable() {
-        // Assuming your plugin's main class implements PluginContext or you create an adapter
-        // For Spigot/Paper:
-        PluginContext pluginContext = new lib.homies.framework.spigot.SpigotPluginContext(this);
-
-        // Load the configuration
-        config = HomiesLib.getConfigManager().loadConfig(pluginContext, MyPluginConfig.class);
-
-        // Use config values
-        getLogger().info("Welcome message: " + config.welcomeMessage);
-        getLogger().info("Economy enabled: " + config.economyEnabled);
-
-        // Example of modifying and saving config (e.g., via an admin command)
-        // config.economyEnabled = false;
-        // HomiesLib.getConfigManager().saveConfig(pluginContext, config);
-    }
-}
-```
-
-### 💾 Database Service (Redis ORM)
-
-Persist and retrieve simple POJOs to/from Redis using annotations.
+Store player data in a central database (Redis, MySQL, or SQLite) to share it across multiple servers.
 
 ```java
-// 1. Define your PlayerData entity (e.g., com.yourcompany.data.MyPlayerData.java)
+// 1. Define your data entity
 package com.yourcompany.data;
 
 import lib.homies.framework.database.annotations.DbEntity;
 import lib.homies.framework.database.annotations.DbField;
-import lombok.Data; // Requires Lombok
-import lombok.NoArgsConstructor; // Requires Lombok
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Data // Lombok annotation for getters, setters, equals, hashCode, toString
-@NoArgsConstructor // Required for reflection-based instantiation by the database service
-@DbEntity(tableName = "my_player_data") // Stores data under keys like "my_player_data:PLAYER_UUID"
-public class MyPlayerData {
+import java.util.UUID;
 
-    @DbField(columnName = "uuid", id = true) // Marks this field as the unique ID in Redis
+@Data
+@NoArgsConstructor
+@DbEntity(tableName = "player_profiles")
+public class PlayerProfile {
+    @DbField(id = true)
     private String uuid;
 
-    @DbField(columnName = "coins")
-    private int coins = 0;
+    @DbField
+    private long coins = 0;
 
-    @DbField(columnName = "last_seen_world")
-    private String lastSeenWorld;
+    @DbField
+    private boolean muted = false;
 
-    // Custom constructor for convenience
-    public MyPlayerData(String uuid) {
-        this.uuid = uuid;
+    public PlayerProfile(UUID uuid) {
+        this.uuid = uuid.toString();
     }
 }
 
-// 2. Use the service in your plugin
+// 2. Use it to manage cross-server state
 import lib.homies.framework.HomiesLib;
-import lib.homies.framework.player.HomiesPlayer;
-import com.yourcompany.data.MyPlayerData;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.java.JavaPlugin; // Import JavaPlugin
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
-public class MyPluginDatabaseExample implements Listener {
+public class MyPluginDatabaseExample extends JavaPlugin implements org.bukkit.event.Listener { // Implement Bukkit Listener
 
-    // Assuming you have a way to get HomiesPlayer from a Bukkit Player
-    // For example, if your main plugin extends HomiesLibSpigot, you might have a method.
-    private HomiesPlayer getHomiesPlayer(Player bukkitPlayer) {
-        // For Spigot:
-        return new lib.homies.framework.spigot.player.SpigotPlayer(bukkitPlayer);
-    }
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        HomiesPlayer homiesPlayer = getHomiesPlayer(event.getPlayer());
-        if (homiesPlayer == null) return;
-
-        Optional<MyPlayerData> data = HomiesLib.getDatabaseService().findById(MyPlayerData.class, homiesPlayer.getUniqueId().toString());
-
-        MyPlayerData playerData = data.orElseGet(() -> {
-            MyPlayerData newData = new MyPlayerData(homiesPlayer.getUniqueId().toString());
-            Player bukkitPlayer = homiesPlayer.getAs(Player.class);
-            if (bukkitPlayer != null) {
-                newData.setLastSeenWorld(bukkitPlayer.getWorld().getName()); // Example of platform-specific data
-            }
-            return newData;
-        });
-
-        HomiesLib.getMessageUtils().send(homiesPlayer, "&aWelcome back! You have &e" + playerData.getCoins() + " coins.");
-        // Store in-memory for quick access if needed
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        HomiesPlayer homiesPlayer = getHomiesPlayer(event.getPlayer());
-        if (homiesPlayer == null) return;
-
-        // Retrieve player data (e.g., from an in-memory map or a dedicated PlayerDataService cache)
-        // For this example, let's assume we're updating some data before saving
-        MyPlayerData playerData = HomiesLib.getDatabaseService().findById(MyPlayerData.class, homiesPlayer.getUniqueId().toString())
-                .orElseGet(() -> new MyPlayerData(homiesPlayer.getUniqueId().toString()));
-
-        playerData.setCoins(playerData.getCoins() + 1); // Example: give 1 coin on quit
-        Player bukkitPlayer = homiesPlayer.getAs(Player.class);
-        if (bukkitPlayer != null) {
-            playerData.setLastSeenWorld(bukkitPlayer.getWorld().getName());
-        }
-
-        HomiesLib.getDatabaseService().saveEntity(playerData); // Save changes to Redis
-    }
-}
-```
-
-### 📢 Event Bus
-
-Subscribe to and call custom events, or listen to native platform events.
-
-```java
-// 1. Define a custom event (e.g., com.yourcompany.events.PlayerLevelUpEvent.java)
-package com.yourcompany.events;
-
-import lib.homies.framework.events.LibEvent;
-import lib.homies.framework.player.HomiesPlayer;
-import lombok.Getter; // Requires Lombok
-
-@Getter
-public class PlayerLevelUpEvent extends LibEvent {
-    private final HomiesPlayer player;
-    private final int oldLevel;
-    private final int newLevel;
-
-    public PlayerLevelUpEvent(HomiesPlayer player, int oldLevel, int newLevel) {
-        this.player = player;
-        this.oldLevel = oldLevel;
-        this.newLevel = newLevel;
-    }
-}
-
-// 2. Use the EventBus in your plugin
-import lib.homies.framework.HomiesLib;
-import lib.homies.framework.player.HomiesPlayer;
-import com.yourcompany.events.PlayerLevelUpEvent;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.plugin.java.JavaPlugin;
-
-public class MyPluginEventExample extends JavaPlugin implements Listener {
-
-    // Assuming you have a way to get HomiesPlayer from a Bukkit Player
-    private HomiesPlayer getHomiesPlayer(Player bukkitPlayer) {
-        // For Spigot:
-        return new lib.homies.framework.spigot.player.SpigotPlayer(bukkitPlayer);
-    }
+    private final Map<UUID, PlayerProfile> cachedPlayerProfiles = new HashMap<>();
 
     @Override
     public void onEnable() {
-        // Subscribe to a custom event
-        HomiesLib.getEventBus().subscribe(PlayerLevelUpEvent.class, event -> {
-            HomiesLib.getMessageUtils().send(event.getPlayer(),
-                    "&aCongratulations! You leveled up from &e" + event.getOldLevel() + " &ato &e" + event.getNewLevel() + "&a!");
-            getLogger().info(event.getPlayer().getName() + " leveled up!");
-        });
-
-        // Subscribe to a native Bukkit event (e.g., PlayerJoinEvent)
-        // Note: For platform events, you still need to register your class as a Bukkit Listener
-        // if you're using @EventHandler annotations for other events.
-        HomiesLib.getEventBus().subscribePlatform(PlayerJoinEvent.class, event -> {
-            HomiesLib.getMessageUtils().broadcast("&b" + event.getPlayer().getName() + " has joined the server!");
-        });
-
-        // Register this class as a Bukkit listener for the subscribePlatform example
         getServer().getPluginManager().registerEvents(this, this);
     }
 
-    // Example of calling a custom event
-    public void giveExperience(HomiesPlayer player, int amount) {
-        int currentLevel = 1; // Get actual level from player data
-        int newLevel = currentLevel + 1; // Calculate new level
-        if (newLevel > currentLevel) {
-            HomiesLib.getEventBus().call(new PlayerLevelUpEvent(player, currentLevel, newLevel));
-        }
-    }
-}
-```
+    @org.bukkit.event.EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        String uuid = event.getPlayer().getUniqueId().toString();
 
-### 🖼️ Menu System (Inventory GUIs)
-
-Create dynamic, paginated, and animated inventory menus.
-
-```java
-// 1. Define your custom menu (e.yourcompany.menus.PlayerListMenu.java)
-package com.yourcompany.menus;
-
-import lib.homies.framework.HomiesLib;
-import lib.homies.framework.menu.AbstractPaginatedHomiesMenu;
-import lib.homies.framework.menu.HomiesMenuItem;
-import lib.homies.framework.menu.SimpleHomiesMenuItem;
-import lib.homies.framework.player.HomiesPlayer;
-import lib.homies.framework.utils.HomiesItemStack;
-import org.bukkit.Material;
-import org.bukkit.entity.Player;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-public class PlayerListMenu extends AbstractPaginatedHomiesMenu {
-
-    public PlayerListMenu() {
-        // Load players asynchronously when the menu is created
-        // In a real scenario, you might pass the player who opened the menu
-        // and fetch data relevant to them.
+        // Asynchronously fetch the player's profile from the central database
         HomiesLib.getSchedulerService().runAsync(() -> {
-            List<HomiesMenuItem> playerItems = Bukkit.getOnlinePlayers().stream()
-                    .map(p -> {
-                        // For Spigot:
-                        HomiesPlayer homiesPlayer = new lib.homies.framework.spigot.player.SpigotPlayer(p);
-                        if (homiesPlayer == null) return null; // Should not happen for online players
+            PlayerProfile profile = HomiesLib.getDatabaseService()
+                    .findById(PlayerProfile.class, uuid)
+                    .orElse(new PlayerProfile(event.getPlayer().getUniqueId())); // Create if it doesn't exist
 
-                        // Create a menu item for each player
-                        return new SimpleHomiesMenuItem(
-                                HomiesLib.getItemBuilder(Material.PLAYER_HEAD.name())
-                                        .name("&a" + homiesPlayer.getName())
-                                        .lore("&7Click to view profile!")
-                                        .setPlayerProfile(HomiesLib.getPlayerHeadUtils().createPlayerProfile(homiesPlayer.getUniqueId())) // Assuming this method exists
-                                        .build(),
-                                clickedPlayer -> {
-                                    HomiesLib.getMessageUtils().send(clickedPlayer, "&aYou clicked on " + homiesPlayer.getName() + "!");
-                                    // Open player profile menu, etc.
-                                }
-                        );
-                    })
-                    .filter(item -> item != null)
-                    .collect(Collectors.toList());
-            setPaginatedContentItems(playerItems);
+            cachedPlayerProfiles.put(event.getPlayer().getUniqueId(), profile); // Cache locally
+
+            if (profile.isMuted()) {
+                // This player is muted network-wide!
+                // Apply mute logic on this server...
+                event.getPlayer().sendMessage("§cYou are muted network-wide!");
+            }
+            event.getPlayer().sendMessage("§aWelcome back! You have §e" + profile.getCoins() + " coins.");
         });
     }
 
-    @Override
-    public String getTitle(HomiesPlayer player) {
-        return "&bOnline Players (Page " + (currentPage + 1) + "/" + getMaxPage() + ")";
-    }
-
-    @Override
-    public int getSize() {
-        return 54; // 6 rows
-    }
-
-    @Override
-    protected int[] getPaginationSlots() {
-        // Slots for items (rows 1-4)
-        return new int[]{10, 11, 12, 13, 14, 15, 16,
-                19, 20, 21, 22, 23, 24, 25,
-                28, 29, 30, 31, 32, 33, 34,
-                37, 38, 39, 40, 41, 42, 43};
-    }
-
-    @Override
-    protected HomiesMenuItem getNextPageButton(HomiesPlayer player) {
-        return new SimpleHomiesMenuItem(
-                HomiesLib.getItemBuilder(Material.ARROW.name())
-                        .name("&aNext Page")
-                        .lore("&7Click to go to the next page.")
-                        .build(),
-                p -> {
-                    nextPage();
-                    HomiesLib.getMenuManager().openMenu(p, this); // Re-open to refresh
-                }
-        );
-    }
-
-    @Override
-    protected HomiesMenuItem getPreviousPageButton(HomiesPlayer player) {
-        return new SimpleHomiesMenuItem(
-                HomiesLib.getItemBuilder(Material.ARROW.name())
-                        .name("&aPrevious Page")
-                        .lore("&7Click to go to the previous page.")
-                        .build(),
-                p -> {
-                    previousPage();
-                    HomiesLib.getMenuManager().openMenu(p, this); // Re-open to refresh
-                }
-        );
-    }
-
-    @Override
-    protected HomiesMenuItem getLoadingItem() {
-        return new SimpleHomiesMenuItem(
-                HomiesLib.getItemBuilder(Material.CLOCK.name())
-                        .name("&eLoading Players...")
-                        .lore("&7Please wait.")
-                        .build()
-        );
-    }
-
-    @Override
-    protected int getNextPageButtonSlot() {
-        return 50; // Bottom right
-    }
-
-    @Override
-    protected int getPreviousPageButtonSlot() {
-        return 48; // Bottom left
-    }
-
-    @Override
-    public Map<Integer, HomiesMenuItem> getItems(HomiesPlayer player) {
-        Map<Integer, HomiesMenuItem> items = super.getItems(player);
-        // Add any fixed items here (e.g., close button, filler glass)
-        HomiesMenuItem filler = new SimpleHomiesMenuItem(
-                HomiesLib.getItemBuilder(Material.GRAY_STAINED_GLASS_PANE.name())
-                        .name(" ")
-                        .build()
-        );
-        for (int i = 0; i < getSize(); i++) {
-            items.putIfAbsent(i, filler);
+    @org.bukkit.event.EventHandler
+    public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        PlayerProfile profile = cachedPlayerProfiles.remove(event.getPlayer().getUniqueId());
+        if (profile != null) {
+            // Example: Update coins on quit
+            profile.setCoins(profile.getCoins() + 10);
+            HomiesLib.getSchedulerService().runAsync(() -> {
+                HomiesLib.getDatabaseService().saveEntity(profile);
+            });
         }
-        return items;
     }
-
-    // Example of opening this menu via a command
-    // @Command(name = "players", playerOnly = true)
-    // public void openPlayerList(HomiesPlayer sender) {
-    //     HomiesLib.getMenuManager().openMenu(sender, new PlayerListMenu());
-    // }
 }
 ```
 
@@ -699,65 +490,67 @@ public class PlayerListMenu extends AbstractPaginatedHomiesMenu {
 Manage platform-independent player data.
 
 ```java
-// Assuming MyPlayerData.java from the Database example is used.
+// Assuming PlayerProfile.java from the Database example is used.
 
 // In your plugin's main class or a service
-
 import lib.homies.framework.HomiesLib;
 import lib.homies.framework.player.HomiesPlayer;
-import lib.homies.framework.playerdata.PlayerData; // Base PlayerData from API
-import com.yourcompany.data.MyPlayerData; // Your custom PlayerData
+import com.yourcompany.data.PlayerProfile; // Your custom PlayerData
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-public class MyPluginPlayerDataExample implements Listener {
+public class MyPluginPlayerDataExample extends JavaPlugin implements Listener {
 
     // In-memory cache for player data
-    private final Map<UUID, MyPlayerData> cachedPlayerData = new HashMap<>();
+    private final Map<UUID, PlayerProfile> cachedPlayerProfiles = new HashMap<>();
 
-    // Assuming you have a way to get HomiesPlayer from a Bukkit Player
     private HomiesPlayer getHomiesPlayer(Player bukkitPlayer) {
-        // For Spigot:
         return new lib.homies.framework.spigot.player.SpigotPlayer(bukkitPlayer);
     }
 
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        HomiesPlayer homiesPlayer = getHomiesPlayer(event.getPlayer());
-        if (homiesPlayer == null) return;
-
-        // Load data from database (or create new if not exists)
-        MyPlayerData data = HomiesLib.getDatabaseService().findById(MyPlayerData.class, homiesPlayer.getUniqueId().toString())
-                .orElseGet(() -> new MyPlayerData(homiesPlayer.getUniqueId().toString()));
-
-        cachedPlayerData.put(homiesPlayer.getUniqueId(), data);
-        HomiesLib.getMessageUtils().send(homiesPlayer, "&aYour current coins: &e" + data.getCoins());
+    @Override
+    public void onEnable() {
+        getServer().getPluginManager().registerEvents(this, this);
     }
 
-    @EventHandler
+    @org.bukkit.event.EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        HomiesPlayer homiesPlayer = getHomiesPlayer(event.getPlayer());
+
+        HomiesLib.getSchedulerService().runAsync(() -> {
+            PlayerProfile profile = HomiesLib.getDatabaseService()
+                    .findById(PlayerProfile.class, homiesPlayer.getUniqueId().toString())
+                    .orElseGet(() -> new PlayerProfile(homiesPlayer.getUniqueId()));
+
+            cachedPlayerProfiles.put(homiesPlayer.getUniqueId(), profile);
+            HomiesLib.getMessageUtils().send(homiesPlayer, "&aWelcome back! You have &e" + profile.getCoins() + " coins.");
+        });
+    }
+
+    @org.bukkit.event.EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         HomiesPlayer homiesPlayer = getHomiesPlayer(event.getPlayer());
-        if (homiesPlayer == null) return;
-
-        MyPlayerData data = cachedPlayerData.remove(homiesPlayer.getUniqueId());
-        if (data != null) {
-            // Save updated data to database
-            HomiesLib.getDatabaseService().saveEntity(data);
-            HomiesLib.getMessageUtils().send(homiesPlayer, "&aYour data has been saved.");
+        PlayerProfile profile = cachedPlayerProfiles.remove(homiesPlayer.getUniqueId());
+        if (profile != null) {
+            // Example: Update coins on quit
+            profile.setCoins(profile.getCoins() + 10);
+            HomiesLib.getSchedulerService().runAsync(() -> {
+                HomiesLib.getDatabaseService().saveEntity(profile);
+            });
         }
     }
 
     // Example of getting player data
-    public Optional<MyPlayerData> getPlayerCoins(HomiesPlayer player) {
-        return Optional.ofNullable(cachedPlayerData.get(player.getUniqueId()));
+    public Optional<PlayerProfile> getPlayerProfile(HomiesPlayer player) {
+        return Optional.ofNullable(cachedPlayerProfiles.get(player.getUniqueId()));
     }
 }
 ```
@@ -769,24 +562,29 @@ Manage time-based cooldowns for players.
 ```java
 import lib.homies.framework.HomiesLib;
 import lib.homies.framework.player.HomiesPlayer;
-import org.bukkit.event.EventHandler;
+import org.bukkit.entity.Player; // Import Player
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.Material;
+import org.bukkit.plugin.java.JavaPlugin; // Import JavaPlugin
 
 import java.util.concurrent.TimeUnit;
 
-public class MyPluginCooldownExample implements Listener {
+public class MyPluginCooldownExample extends JavaPlugin implements Listener {
 
     private static final String ABILITY_COOLDOWN_KEY = "super_ability_cooldown";
 
-    // Assuming you have a way to get HomiesPlayer from a Bukkit Player
     private HomiesPlayer getHomiesPlayer(Player bukkitPlayer) {
-        // For Spigot:
         return new lib.homies.framework.spigot.player.SpigotPlayer(bukkitPlayer);
     }
 
-    @EventHandler
+    @Override
+    public void onEnable() {
+        super.onEnable();
+        getServer().getPluginManager().registerEvents(this, this);
+    }
+
+    @org.bukkit.event.EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event.getItem() == null || event.getItem().getType() != Material.BLAZE_ROD) {
             return;
@@ -821,19 +619,22 @@ import lib.homies.framework.HomiesLib;
 import lib.homies.framework.party.Party;
 import lib.homies.framework.player.HomiesPlayer;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Optional;
 
-public class MyPluginPartyExample implements Listener {
+public class MyPluginPartyExample extends JavaPlugin implements Listener {
 
-    // Assuming you have a way to get HomiesPlayer from a Bukkit Player
     private HomiesPlayer getHomiesPlayer(Player bukkitPlayer) {
-        // For Spigot:
         return new lib.homies.framework.spigot.player.SpigotPlayer(bukkitPlayer);
+    }
+
+    @Override
+    public void onEnable() {
+        super.onEnable();
+        getServer().getPluginManager().registerEvents(this, this);
     }
 
     // Example: Command to create a party
@@ -865,7 +666,7 @@ public class MyPluginPartyExample implements Listener {
     //     HomiesLib.getPartyService().leaveParty(sender);
     // }
 
-    @EventHandler
+    @org.bukkit.event.EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         HomiesPlayer homiesPlayer = getHomiesPlayer(event.getPlayer());
         if (homiesPlayer == null) return;
@@ -882,80 +683,109 @@ public class MyPluginPartyExample implements Listener {
 }
 ```
 
-### ✨ Utilities
+### 🖼️ GUI Menu System
 
-HomiesLib provides various utility methods for common tasks.
+Create a dynamic, multi-page menu.
 
 ```java
+package com.yourcompany.menus;
+
 import lib.homies.framework.HomiesLib;
+import lib.homies.framework.menu.AbstractPaginatedHomiesMenu;
+import lib.homies.framework.menu.HomiesMenuItem;
+import lib.homies.framework.menu.SimpleHomiesMenuItem;
 import lib.homies.framework.player.HomiesPlayer;
+import lib.homies.framework.spigot.player.SpigotPlayer;
 import lib.homies.framework.utils.HomiesItemStack;
-import lib.homies.framework.world.HomiesLocation;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.Location;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.Player; // Import Player
 
-import java.util.UUID;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-public class MyPluginUtilityExample {
+public class PlayerListMenu extends AbstractPaginatedHomiesMenu {
 
-    // Assuming you have a way to get HomiesPlayer from a Bukkit Player
-    private HomiesPlayer getHomiesPlayer(Player bukkitPlayer) {
-        // For Spigot:
-        return new lib.homies.framework.spigot.player.SpigotPlayer(bukkitPlayer);
+    public PlayerListMenu() {
+        // Asynchronously populate the menu items
+        HomiesLib.getSchedulerService().runAsync(() -> {
+            List<HomiesMenuItem> playerItems = Bukkit.getOnlinePlayers().stream()
+                    .map(p -> {
+                        HomiesPlayer homiesPlayer = new SpigotPlayer(p);
+                        HomiesItemStack playerHead = HomiesLib.getPlayerHeadUtils().createPlayerHead(homiesPlayer.getUniqueId());
+
+                        return new SimpleHomiesMenuItem(
+                                HomiesLib.getItemBuilder(playerHead)
+                                        .name("&a" + homiesPlayer.getName())
+                                        .lore("&7Click to view profile!")
+                                        .build(),
+                                clickedPlayer -> {
+                                    HomiesLib.getMessageUtils().send(clickedPlayer, "&aYou clicked on " + homiesPlayer.getName() + "!");
+                                    // Open player profile menu, etc.
+                                }
+                        );
+                    })
+                    .collect(Collectors.toList());
+            setPaginatedContentItems(playerItems);
+        });
     }
 
-    public void exampleUsage(Player bukkitPlayer) {
-        HomiesPlayer homiesPlayer = getHomiesPlayer(bukkitPlayer);
-        if (homiesPlayer == null) return;
+    @Override
+    public String getTitle(HomiesPlayer player) {
+        return "&bOnline Players (Page " + (currentPage + 1) + "/" + getMaxPage() + ")";
+    }
 
-        // --- TextUtils ---
-        String coloredText = HomiesLib.getTextUtils().colorize("&aHello &bWorld!");
-        HomiesLib.getMessageUtils().send(homiesPlayer, coloredText); // Uses MessageUtils
+    @Override
+    public int getSize() {
+        return 54; // 6 rows
+    }
 
-        String gradientText = HomiesLib.getTextUtils().gradient("HomiesLib", "RED", "BLUE");
-        HomiesLib.getMessageUtils().send(homiesPlayer, gradientText);
+    @Override
+    protected int[] getPaginationSlots() {
+        return new int[]{10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43};
+    }
 
-        // --- MessageUtils ---
-        HomiesLib.getMessageUtils().broadcast("&eEveryone, look at &a" + homiesPlayer.getName() + "&e!");
-        HomiesLib.getMessageUtils().actionBar(homiesPlayer, "&fYou are doing great!");
-        HomiesLib.getMessageUtils().title(homiesPlayer, "&6Welcome", "&7To the server!", 10, 70, 20);
+    @Override
+    protected HomiesMenuItem getNextPageButton(HomiesPlayer player) {
+        return new SimpleHomiesMenuItem(
+                HomiesLib.getItemBuilder(Material.ARROW.name()).name("§aNext Page").build(),
+                p -> {
+                    nextPage();
+                    HomiesLib.getMenuManager().openMenu(p, this);
+                }
+        );
+    }
 
-        // --- ItemBuilder & PlayerHeadUtils ---
-        HomiesItemStack customItem = HomiesLib.getItemBuilder(Material.DIAMOND_SWORD.name())
-                .name("&cLegendary Sword")
-                .lore("&7A sword of legends.", "&7Damage: &c+10")
-                .enchant("SHARPNESS", 5)
-                .flag("HIDE_ENCHANTS")
-                .build();
-        // Give item to player (platform-specific)
-        // You need to cast HomiesItemStack back to the platform-specific ItemStack
-        org.bukkit.inventory.ItemStack bukkitItemStack = customItem.getAs(org.bukkit.inventory.ItemStack.class);
-        if (bukkitItemStack != null) {
-            bukkitPlayer.getInventory().addItem(bukkitItemStack);
+    @Override
+    protected HomiesMenuItem getPreviousPageButton(HomiesPlayer player) {
+        return new SimpleHomiesMenuItem(
+                HomiesLib.getItemBuilder(Material.ARROW.name()).name("§cPrevious Page").build(),
+                p -> {
+                    previousPage();
+                    HomiesLib.getMenuManager().openMenu(p, this);
+                }
+        );
+    }
+
+    @Override
+    protected int getNextPageButtonSlot() {
+        return 50;
+    }
+
+    @Override
+    protected int getPreviousPageButtonSlot() {
+        return 48;
+    }
+
+    @Override
+    public Map<Integer, HomiesMenuItem> getItems(HomiesPlayer player) {
+        Map<Integer, HomiesMenuItem> items = super.getItems(player);
+        HomiesMenuItem filler = new SimpleHomiesMenuItem(HomiesLib.getItemBuilder(Material.GRAY_STAINED_GLASS_PANE.name()).name(" ").build());
+        for (int i = 0; i < getSize(); i++) {
+            items.putIfAbsent(i, filler);
         }
-
-        HomiesItemStack playerHead = HomiesLib.getPlayerHeadUtils().createPlayerHead(homiesPlayer.getUniqueId());
-        org.bukkit.inventory.ItemStack playerHeadItemStack = playerHead.getAs(org.bukkit.inventory.ItemStack.class);
-        if (playerHeadItemStack != null) {
-            bukkitPlayer.getInventory().addItem(playerHeadItemStack);
-        }
-
-        // --- LocationUtils ---
-        Location bukkitLoc = bukkitPlayer.getLocation();
-        // Create a platform-specific HomiesLocation wrapper
-        HomiesLocation homiesLoc;
-        // For Spigot:
-        homiesLoc = new lib.homies.framework.spigot.world.SpigotLocation(bukkitLoc);
-
-        String serializedLoc = HomiesLib.getLocationUtils().serialize(homiesLoc);
-        HomiesLib.getMessageUtils().send(homiesPlayer, "&aYour location: &f" + serializedLoc);
-
-        HomiesLocation deserializedLoc = HomiesLib.getLocationUtils().deserialize(serializedLoc);
-        if (deserializedLoc != null && HomiesLib.getLocationUtils().isSafe(deserializedLoc)) {
-            HomiesLib.getLocationUtils().safeTeleport(homiesPlayer, deserializedLoc);
-            HomiesLib.getMessageUtils().send(homiesPlayer, "&aTeleported to saved location!");
-        }
+        return items;
     }
 }
 ```
@@ -965,7 +795,6 @@ public class MyPluginUtilityExample {
 The `MinigameManager` and `AbstractMiniGame` provide a core structure for building minigames.
 
 ```java
-// 1. Define your custom minigame (e.g., com.yourcompany.minigames.MyAwesomeMinigame.java)
 package com.yourcompany.minigames;
 
 import lib.homies.framework.HomiesLib;
@@ -975,7 +804,8 @@ import lib.homies.framework.player.HomiesPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.Player; // Import Player
+import org.bukkit.plugin.java.JavaPlugin; // Import JavaPlugin
 
 import java.util.UUID;
 
@@ -1055,6 +885,7 @@ public class MyPluginMinigameExample extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        super.onEnable(); // Call superclass onEnable
         // Example: Create and register a minigame
         World world = Bukkit.getWorld("world"); // Or get your specific game world
         if (world == null) {
@@ -1082,6 +913,7 @@ public class MyPluginMinigameExample extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        super.onDisable(); // Call superclass onDisable
         if (activeMinigame != null && activeMinigame.getState() != MiniGameState.STOPPED) {
             activeMinigame.stop();
         }
@@ -1119,16 +951,20 @@ Artifacts will be in each module’s `target` directory.
 
 ## 📜 License
 
-This project is licensed under the MIT License. See the `LICENSE` file in the repository root.
+This project is licensed under the **MIT License**. See the `LICENSE` file for full details.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are always welcome! Let's make HomiesLib the best framework out there!
+This is an open-source project, and contributions are always welcome! Whether it's reporting a bug, suggesting a new
+feature, or submitting a code change, your input is valued.
 
-*   Open an issue describing the change.
-*   Keep PRs focused and include minimal reproducible examples.
-*   Follow the module structure and Java 17 compatibility.
+* **Bug Reports & Feature Requests:** Please open an issue on the GitHub Issues page.
+* **Code Contributions:** Please follow the standard Fork & Pull Request workflow.
+    1. Fork the repository.
+    2. Create a new branch for your feature or fix.
+    3. Make your changes and commit them with a clear message.
+    4. Push your branch and open a Pull Request.
 
 ---
