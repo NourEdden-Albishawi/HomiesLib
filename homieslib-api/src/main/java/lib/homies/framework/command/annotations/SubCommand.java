@@ -39,6 +39,20 @@ public @interface SubCommand {
     String usage() default "";
 
     /**
+     * The permission node required to execute this subcommand.
+     *
+     * @return The permission node.
+     */
+    String permission() default "";
+
+    /**
+     * The message to send if the player lacks the required permission.
+     *
+     * @return The permission message.
+     */
+    String permissionMessage() default "&cYou do not have permission to execute this command.";
+
+    /**
      * Whether this subcommand can only be executed by a player.
      *
      * @return true if player-only, false otherwise.
