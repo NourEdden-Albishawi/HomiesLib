@@ -1,8 +1,8 @@
 # ✨ HomiesLib: The Ultimate Minecraft Plugin Framework ✨
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-username/HomiesLib/actions)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/your-username/HomiesLib/releases)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey)](https://github.com/your-username/HomiesLib/blob/main/LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/NourEdden-Albishawi/HomiesLib/actions)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/NourEdden-Albishawi/HomiesLib/releases)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](https://github.com/NourEdden-Albishawi/HomiesLib/blob/main/LICENSE)
 
 **HomiesLib** is a powerful, multi-platform framework designed for Minecraft plugin developers who want to build
 high-performance, feature-rich plugins with unparalleled simplicity. By providing a clean, API-driven architecture,
