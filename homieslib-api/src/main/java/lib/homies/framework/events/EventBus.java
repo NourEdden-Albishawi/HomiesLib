@@ -36,4 +36,13 @@ public interface EventBus {
      * @param <T> The type of the platform event.
      */
     <T> void subscribePlatform(Class<T> platformEventClass, Consumer<T> handler);
+
+    /**
+     * Registers an object containing methods that act as event listeners.
+     * Each method intended as a listener should be manually registered or follow a convention
+     * for the specific platform's event handling mechanism.
+     *
+     * @param listener The listener object to register.
+     */
+    void register(Object listener);
 }
