@@ -40,6 +40,15 @@ public abstract class AbstractHomiesMenu implements HomiesMenu {
         // Default: Do nothing, subclasses can override
     }
 
+    /**
+     * Default empty implementation. Subclasses should override this method to re-read configuration
+     * and rebuild their internal state when a refresh is requested.
+     */
+    @Override
+    public void refresh() {
+        // Default: Do nothing, subclasses can override
+    }
+
     // Subclasses must implement getTitle, getSize, and getItems
     @Override
     public abstract String getTitle(HomiesPlayer player);
