@@ -3,6 +3,7 @@ package lib.homies.framework.database;
 import lib.homies.framework.database.annotations.DbEntity;
 import lib.homies.framework.database.annotations.DbField;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -12,38 +13,45 @@ import java.util.Optional;
  */
 public interface DatabaseService {
 
-    /**
-     * Retrieves a registered repository by its class.
-     * Repositories are typically registered during framework initialization.
-     * @param repoClass The class of the repository to retrieve.
-     * @return An {@link Optional} containing the repository if found, otherwise {@link Optional#empty()}.
-     * @param <T> The type of the repository, which must extend {@link IRepository}.
-     */
     <T extends IRepository<?>> Optional<T> getRepository(Class<T> repoClass);
 
+    <T> void saveEntity(T entity);
+
+    <T> Optional<T> findById(Class<T> entityType, String id);
+
+    <T> List<T> findAll(Class<T> entityType);
+
     /**
-     * Saves an entity to the database using reflection and annotations.
+     * Finds and retrieves all entities that match a specific field-value pair.
+     *
+     * @param entityType The class of the entities to find.
+     * @param fieldName  The name of the database column to query.
+     * @param value      The value to match against.
+     * @param <T>        The entity type.
+     * @return A {@link List} of all found entities, or an empty list if none are found.
+     */
+    <T> List<T> findByField(Class<T> entityType, String fieldName, Object value);
+
+    /**
+     * Deletes an entity from the database.
      * The entity's class must be annotated with {@link DbEntity} and have an ID field
      * annotated with {@link DbField}(id=true).
      *
-     * @param entity The entity object to save.
+     * @param entity The entity object to delete.
      * @param <T> The entity type.
      * @throws IllegalArgumentException if the entity class is not annotated with @DbEntity.
      * @throws IllegalStateException if the entity does not have an ID field.
-     * @throws RuntimeException if saving fails due to reflection errors or database issues.
+     * @throws RuntimeException if deletion fails due to reflection errors or database issues.
      */
-    <T> void saveEntity(T entity);
+    <T> void deleteEntity(T entity);
 
     /**
-     * Finds and retrieves an entity from the database by its ID.
-     * The entity's class must be annotated with {@link DbEntity}.
+     * Deletes entities from the database that match a specific field-value pair.
      *
-     * @param entityType The class of the entity to find.
-     * @param id         The ID of the entity.
+     * @param entityType The class of the entities to delete.
+     * @param fieldName  The name of the database column to match.
+     * @param value      The value to match against.
      * @param <T>        The entity type.
-     * @return An {@link Optional} containing the found entity, or {@link Optional#empty()} if not found.
-     * @throws IllegalArgumentException if the entityType is not annotated with @DbEntity.
-     * @throws RuntimeException if retrieval or mapping fails due to reflection errors or database issues.
      */
-    <T> Optional<T> findById(Class<T> entityType, String id);
+    <T> void deleteByField(Class<T> entityType, String fieldName, Object value);
 }
