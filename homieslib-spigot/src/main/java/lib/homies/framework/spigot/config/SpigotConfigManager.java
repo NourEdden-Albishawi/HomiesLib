@@ -1,16 +1,19 @@
 package lib.homies.framework.spigot.config;
 
+import lib.homies.framework.HomiesLib;
 import lib.homies.framework.PluginContext;
 import lib.homies.framework.config.ConfigManager;
 import lib.homies.framework.config.annotations.ConfigFile;
 import lib.homies.framework.config.annotations.ConfigKey;
+import lib.homies.framework.events.MenuReloadEvent;
+import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.util.List;
 
 /**
  * Spigot-specific implementation of the {@link ConfigManager} interface.
@@ -19,27 +22,9 @@ import java.lang.reflect.Field;
  */
 public class SpigotConfigManager implements ConfigManager {
 
-    /**
-     * Constructs a new SpigotConfigManager.
-     * The plugin instance is no longer directly managed by the manager itself,
-     * but passed with each load/save operation via {@link PluginContext}.
-     */
     public SpigotConfigManager() {
-        // No plugin parameter needed in constructor anymore
     }
 
-    /**
-     * Loads a configuration class, creating the file with default values if it doesn't exist.
-     * The configuration class must be a POJO annotated with {@link ConfigFile}.
-     * Fields within the class intended for configuration should be annotated with {@link ConfigKey}.
-     *
-     * @param callingPluginContext The context of the plugin calling this method, used to access its data folder and resources.
-     * @param configClass The class representing the configuration.
-     * @return An instance of the configuration class populated with values from the file.
-     * @param <T> The type of the configuration class.
-     * @throws IllegalArgumentException if the configClass is not annotated with @ConfigFile.
-     * @throws RuntimeException if loading or saving fails due to I/O or reflection errors.
-     */
     @Override
     public <T> T loadConfig(PluginContext callingPluginContext, Class<T> configClass) {
         try {
@@ -52,19 +37,15 @@ public class SpigotConfigManager implements ConfigManager {
 
             File dataFolder = callingPluginContext.getDataFolder();
             if (!dataFolder.exists()) {
-                dataFolder.mkdirs(); // Ensure the data folder exists
+                dataFolder.mkdirs();
             }
 
             File file = new File(dataFolder, configFile.fileName());
             if (!file.exists()) {
-                // Check if the resource exists in the JAR
                 try (InputStream is = callingPluginContext.getResource(configFile.fileName())) {
                     if (is != null) {
-                        // Resource exists in JAR, save it to data folder
                         callingPluginContext.saveResource(configFile.fileName(), false);
                     } else {
-                        // Resource does NOT exist in JAR. Create an empty file.
-                        // The defaults will be written by the loop below and then saved.
                         file.createNewFile();
                     }
                 }
@@ -75,18 +56,48 @@ public class SpigotConfigManager implements ConfigManager {
             for (Field field : configClass.getDeclaredFields()) {
                 if (field.isAnnotationPresent(ConfigKey.class)) {
                     field.setAccessible(true);
-                    String path = field.getName(); // Simple path based on field name
+                    ConfigKey configKey = field.getAnnotation(ConfigKey.class);
+                    String path = configKey.path();
+                    if (path.isEmpty()) {
+                        path = field.getName();
+                    }
 
                     if (fileConfig.contains(path)) {
-                        // Load value from file
-                        field.set(configInstance, fileConfig.get(path));
+                        Object value = fileConfig.get(path);
+                        Class<?> fieldType = field.getType();
+
+                        // Handle specific type conversions
+                        if (fieldType.isArray() && value instanceof List) {
+                            if (fieldType.getComponentType() == int.class) {
+                                List<?> list = (List<?>) value;
+                                int[] intArray = new int[list.size()];
+                                for (int i = 0; i < list.size(); i++) {
+                                    if (list.get(i) instanceof Number) {
+                                        intArray[i] = ((Number) list.get(i)).intValue();
+                                    }
+                                }
+                                value = intArray;
+                            }
+                            // Add other array type conversions here if needed (e.g., String[], double[])
+                        } else if (fieldType == String.class && value instanceof String) {
+                            value = ChatColor.translateAlternateColorCodes('&', (String) value);
+                        }
+
+                        try {
+                            field.set(configInstance, value);
+                        } catch (IllegalArgumentException e) {
+                            // Provide a more detailed error message for type mismatches
+                            throw new IllegalArgumentException("Type mismatch for config key '" + path + "'. Expected " + fieldType.getName() + " but got " + value.getClass().getName() + ".", e);
+                        }
                     } else {
-                        // If value not in file, set default from instance and save to file
                         fileConfig.set(path, field.get(configInstance));
                     }
                 }
             }
             fileConfig.save(file);
+
+            // Fire the MenuReloadEvent after config is loaded/reloaded
+            HomiesLib.getEventBus().call(new MenuReloadEvent());
 
             return configInstance;
         } catch (Exception e) {
@@ -94,15 +105,6 @@ public class SpigotConfigManager implements ConfigManager {
         }
     }
 
-    /**
-     * Saves the current state of a configuration object back to its file.
-     * The configuration object must be an instance of a class annotated with {@link ConfigFile}.
-     *
-     * @param callingPluginContext The context of the plugin calling this method, used to access its data folder.
-     * @param configInstance The configuration object to save.
-     * @throws IllegalArgumentException if the configInstance's class is not annotated with @ConfigFile.
-     * @throws RuntimeException if saving fails due to I/O or reflection errors.
-     */
     @Override
     public void saveConfig(PluginContext callingPluginContext, Object configInstance) {
         try {
@@ -114,7 +116,7 @@ public class SpigotConfigManager implements ConfigManager {
 
             File dataFolder = callingPluginContext.getDataFolder();
             if (!dataFolder.exists()) {
-                dataFolder.mkdirs(); // Ensure the data folder exists
+                dataFolder.mkdirs();
             }
 
             File file = new File(dataFolder, configFile.fileName());
@@ -123,7 +125,11 @@ public class SpigotConfigManager implements ConfigManager {
             for (Field field : configClass.getDeclaredFields()) {
                 if (field.isAnnotationPresent(ConfigKey.class)) {
                     field.setAccessible(true);
-                    String path = field.getName();
+                    ConfigKey configKey = field.getAnnotation(ConfigKey.class);
+                    String path = configKey.path();
+                    if (path.isEmpty()) {
+                        path = field.getName();
+                    }
                     fileConfig.set(path, field.get(configInstance));
                 }
             }
