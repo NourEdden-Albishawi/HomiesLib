@@ -2,3 +2,5 @@ name: HomiesLibSpigot
 version: 1.0-SNAPSHOT
 main: lib.homies.framework.spigot.HomiesLibSpigot
 api-version: 1.21
+description: A powerful, multi-platform framework for Minecraft plugin developers, offering annotation-driven commands, flexible scheduling, robust database services, dynamic GUI menus, and more, designed for high-performance and unparalleled simplicity.
+authors: [ Nour Edden Albishawi (Al3mid3x) ]
