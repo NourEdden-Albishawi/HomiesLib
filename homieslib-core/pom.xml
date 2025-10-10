@@ -30,6 +30,14 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Jedis for Redis connectivity, now part of core -->
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>4.3.1</version>
+            <scope>compile</scope>
+        </dependency>
+
         <!-- Reflections can be a useful tool for a core module, so we can keep it -->
         <dependency>
             <groupId>org.reflections</groupId>
