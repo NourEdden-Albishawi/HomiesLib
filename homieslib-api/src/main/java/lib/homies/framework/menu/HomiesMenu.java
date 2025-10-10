@@ -74,4 +74,10 @@ public interface HomiesMenu {
     default long getAnimationOutDelayTicks() {
         return 0; // Default to no animation
     }
+
+    /**
+     * Called to signal the menu to refresh its contents, typically after a configuration reload.
+     * Implementations should re-read necessary configuration and rebuild their internal state.
+     */
+    void refresh();
 }
