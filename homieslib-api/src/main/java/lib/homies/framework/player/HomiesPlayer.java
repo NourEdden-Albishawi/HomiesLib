@@ -5,15 +5,10 @@ import java.util.UUID;
 public interface HomiesPlayer {
 
     String getName();
-
     UUID getUniqueId();
-
     void sendMessage(String message);
-
     boolean hasPermission(String permission);
-
     void setHealth(double health);
-
     double getMaxHealth();
 
     /**
