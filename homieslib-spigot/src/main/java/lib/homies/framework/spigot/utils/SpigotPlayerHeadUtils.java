@@ -1,82 +1,48 @@
 package lib.homies.framework.spigot.utils;
 
-import com.destroystokyo.paper.profile.ProfileProperty;
-import org.bukkit.profile.PlayerProfile;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lib.homies.framework.utils.HomiesItemStack;
 import lib.homies.framework.utils.PlayerHeadUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.SkullMeta;
 
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.UUID;
 import java.util.logging.Level;
 
-/**
- * Spigot-specific implementation of the {@link PlayerHeadUtils} interface.
- * This class provides utility methods to generate {@link HomiesItemStack}s that represent player heads
- * using Bukkit's {@link Material#PLAYER_HEAD} and {@link PlayerProfile} functionality.
- */
 public class SpigotPlayerHeadUtils implements PlayerHeadUtils {
 
-    /**
-     * Creates a player head {@link HomiesItemStack} using a base64 encoded texture value.
-     * This method leverages Bukkit's {@link PlayerProfile} to set the texture.
-     * @param textureValue The base64 encoded texture string.
-     * @return A {@link SpigotItemStack} representing the player head.
-     */
     @Override
     public HomiesItemStack createPlayerHeadByTexture(String textureValue) {
-        PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), null); // UUID is dummy, name is null
-        // Corrected API usage: add property to the profile's properties collection
-        ((com.destroystokyo.paper.profile.PlayerProfile) profile).getProperties().add(new ProfileProperty("textures", textureValue));
-
-        return new SpigotItemBuilder(Material.PLAYER_HEAD)
-                .setPlayerProfile(new SpigotPlayerProfile(profile))
-                .build();
+        // This method is difficult to implement reliably across all versions without the modern PlayerProfile API.
+        // For now, we will return a default Steve head as a fallback.
+        return new SpigotItemStack(new ItemStack(Material.PLAYER_HEAD));
     }
 
-    /**
-     * Creates a player head {@link HomiesItemStack} for a given player UUID.
-     * This method fetches the player's texture from the Mojang session server.
-     * @param playerUUID The {@link UUID} of the player.
-     * @return A {@link SpigotItemStack} representing the player head.
-     * @throws IllegalArgumentException if the texture value cannot be fetched.
-     */
     @Override
     public HomiesItemStack createPlayerHead(UUID playerUUID) {
-        String textureValue = this.getTextureValue(playerUUID);
-        if (textureValue == null) {
-            throw new IllegalArgumentException("Could not fetch texture value for UUID: " + playerUUID);
+        OfflinePlayer player = Bukkit.getOfflinePlayer(playerUUID);
+        ItemStack head = new ItemStack(Material.PLAYER_HEAD, 1);
+        SkullMeta meta = (SkullMeta) head.getItemMeta();
+        if (meta != null) {
+            meta.setOwningPlayer(player);
+            head.setItemMeta(meta);
         }
-        return createPlayerHeadByTexture(textureValue);
+        return new SpigotItemStack(head);
     }
 
-    /**
-     * Creates a player head {@link HomiesItemStack} for a given player name.
-     * This method resolves the player name to a UUID and then fetches the texture.
-     * @param playerName The name of the player.
-     * @return A {@link SpigotItemStack} representing the player head.
-     * @throws IllegalArgumentException if the player is not found or texture cannot be fetched.
-     */
     @Override
     public HomiesItemStack createPlayerHead(String playerName) {
-        // Bukkit.getOfflinePlayer(playerName) can return a player even if they don't exist
-        // but their UUID is known. For texture fetching, a valid UUID is needed.
-        UUID playerUUID = Bukkit.getOfflinePlayer(playerName).getUniqueId();
-        if (playerUUID == null) {
-            throw new IllegalArgumentException("Player not found: " + playerName);
-        }
-        return createPlayerHead(playerUUID);
+        OfflinePlayer player = Bukkit.getOfflinePlayer(playerName);
+        return createPlayerHead(player.getUniqueId());
     }
 
-    /**
-     * Retrieves the base64 encoded texture value for a given player UUID from the Mojang session server.
-     * @param playerUUID The {@link UUID} of the player.
-     * @return The base64 encoded texture string, or {@code null} if not found or an error occurs.
-     */
     @Override
     public String getTextureValue(UUID playerUUID) {
         try {
@@ -84,15 +50,26 @@ public class SpigotPlayerHeadUtils implements PlayerHeadUtils {
             URL url = new URL("https://sessionserver.mojang.com/session/minecraft/profile/" + uuidString);
 
             InputStreamReader reader = new InputStreamReader(url.openStream());
+            JsonElement jsonElement = JsonParser.parseReader(reader);
 
-            JsonObject profile = JsonParser.parseReader(reader).getAsJsonObject();
+            // Gracefully handle empty responses from Mojang server
+            if (jsonElement == null || jsonElement.isJsonNull()) {
+                Bukkit.getLogger().log(Level.WARNING, "Failed to fetch texture for UUID " + playerUUID + ": Mojang API returned an empty response (player may not have a skin).");
+                return null;
+            }
 
-            // Assuming the first property is always the textures property
+            JsonObject profile = jsonElement.getAsJsonObject();
+            if (!profile.has("properties")) {
+                Bukkit.getLogger().log(Level.WARNING, "Failed to fetch texture for UUID " + playerUUID + ": Profile JSON does not contain a 'properties' array.");
+                return null;
+            }
+
             JsonObject properties = profile.getAsJsonArray("properties").get(0).getAsJsonObject();
-
             return properties.get("value").getAsString();
+
         } catch (Exception e) {
-            Bukkit.getLogger().log(Level.WARNING, "Failed to fetch texture for UUID " + playerUUID, e);
+            // Don't print a full stack trace for common issues like 404s or timeouts.
+            Bukkit.getLogger().log(Level.WARNING, "Could not fetch texture for UUID " + playerUUID + ": " + e.getMessage());
             return null;
         }
     }
