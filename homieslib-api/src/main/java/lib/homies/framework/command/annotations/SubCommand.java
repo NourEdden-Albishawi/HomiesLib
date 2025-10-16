@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 public @interface SubCommand {
     /**
-     * The name or pattern of the subcommand (e.g., "help", "set <value>").
+     * The name or pattern of the subcommand (e.g., "help", {@code "set <value>"}).
      * @return The subcommand name or pattern.
      */
     String value();

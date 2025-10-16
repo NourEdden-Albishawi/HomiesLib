@@ -21,14 +21,16 @@ public @interface TabComplete {
     /**
      * The command or subcommand path this completer applies to.
      * For example, "" for the main command, "subcommand" for a specific subcommand,
-     * or "subcommand <arg1>" for completion after the first argument of a subcommand.
-     * Placeholders like &lt;player&gt; or &lt;amount&gt; can be used to indicate argument positions.
+     * or {@code "subcommand <arg1>"} for completion after the first argument of a subcommand.
+     * Placeholders like {@code <player>} or {@code <amount>} can be used to indicate argument positions.
+     * @return The path this completer applies to.
      */
     String value() default "";
 
     /**
      * An array of aliases for the subcommand path this completer applies to.
      * These aliases will also trigger this tab completer.
+     * @return An array of aliases.
      */
     String[] aliases() default {};
 }
