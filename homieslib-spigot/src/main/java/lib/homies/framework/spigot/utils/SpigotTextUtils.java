@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 
 /**
  * Spigot-specific implementation of the {@link TextUtils} interface.
- * This class uses Bukkit's {@link ChatColor} for colorization, including modern hex color support (&#RRGGBB).
+ * This class uses Bukkit's {@link ChatColor} for colorization, including modern hex color support ({@code &#RRGGBB}).
  */
 public class SpigotTextUtils implements TextUtils {
 
@@ -17,7 +17,7 @@ public class SpigotTextUtils implements TextUtils {
     private static final Pattern HEX_PATTERN = Pattern.compile("&#([A-Fa-f0-9]{6})");
 
     /**
-     * Colorizes a given string using both standard Bukkit color codes (&) and modern hex codes (&#RRGGBB).
+     * Colorizes a given string using both standard Bukkit color codes ({@code &}) and modern hex codes ({@code &#RRGGBB}).
      * @param text The input string with color codes.
      * @return The colorized string.
      */
