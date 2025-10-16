@@ -50,7 +50,7 @@ public final class HomiesLibSpigot extends JavaPlugin {
 
         // --- CONFIGURATION LOADING ---
         SpigotPluginContext homiesLibPluginContext = new SpigotPluginContext(this);
-        this.homiesLibConfig = HomiesLib.getConfigManager().loadConfig(homiesLibPluginContext, HomiesLibConfig.class);
+        this.homiesLibConfig = HomiesLib.getConfigManager().loadConfig(homiesLibPluginContext, HomiesLibConfig.class).join();
 
         // --- DATABASE INITIALIZATION ---
         List<Class<?>> entityClasses = discoverEntityClasses();
