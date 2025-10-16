@@ -37,9 +37,9 @@
 
     <modules>
         <module>homieslib-api</module>
-        <module>homieslib-spigot</module>
         <module>homieslib-processor</module>
         <module>homieslib-core</module>
+        <module>homieslib-spigot</module>
         <module>homieslib-assembly</module>
     </modules>
 
