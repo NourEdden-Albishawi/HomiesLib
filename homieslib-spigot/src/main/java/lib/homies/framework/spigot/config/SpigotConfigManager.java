@@ -110,7 +110,7 @@ public class SpigotConfigManager implements ConfigManager {
                 fileConfig.save(file);
 
                 // Dispatch the event back to the main thread
-                HomiesLib.getSchedulerService().run(() -> HomiesLib.getEventBus().call(new MenuReloadEvent()));
+                HomiesLib.getSchedulerService().runLater(() -> HomiesLib.getEventBus().call(new MenuReloadEvent()), 1L);
 
                 return configInstance;
             } catch (Exception e) {
