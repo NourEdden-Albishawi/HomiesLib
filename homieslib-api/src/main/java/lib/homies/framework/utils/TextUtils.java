@@ -6,7 +6,7 @@ package lib.homies.framework.utils;
  */
 public interface TextUtils {
     /**
-     * Colorizes a given string using platform-specific color codes (e.g., '&' codes for Minecraft).
+     * Colorizes a given string using platform-specific color codes (e.g., {@code '&'} codes for Minecraft).
      * @param text The input string with color codes.
      * @return The colorized string.
      */
